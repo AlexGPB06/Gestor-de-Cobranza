@@ -1,0 +1,15 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Ejecutar Saas Cobranza",
+            "request": "launch",
+            "mainClass": "com.cobranza.saas_cobranza.SaasCobranzaApplication",
+            "projectName": "saas-cobranza",
+            "env": {
+                "DB_PASSWORD": "Password123"
+            }
+        }
+    ]
+}
