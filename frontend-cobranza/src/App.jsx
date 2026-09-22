@@ -16,38 +16,33 @@ function App() {
   const [deudores, setDeudores] = useState([]);
   const [deudas, setDeudas] = useState([]);
   const [gestiones, setGestiones] = useState([]);
+  const [pagos, setPagos] = useState([]);
 
+  // --- ESTADOS DE UI ---
   const [vistaActual, setVistaActual] = useState('gestion');
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [deudorBuscado, setDeudorBuscado] = useState(null);
   const [mensajeBusqueda, setMensajeBusqueda] = useState('');
 
-  const cargarGestiones = () => {
-    axios.get('http://localhost:8080/api/gestiones')
-      .then(response => setGestiones(response.data))
-      .catch(error => console.error("Error en gestiones:", error));
+  // Función que recarga todo lo que puede cambiar al hacer una gestión o pago
+  const recargarDatosDinamicos = () => {
+    axios.get('http://localhost:8080/api/deudas').then(res => setDeudas(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/gestiones').then(res => setGestiones(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/pagos').then(res => setPagos(res.data)).catch(console.error);
   };
 
-  // Solo cargamos la base de datos si el empleado ya inició sesión
   useEffect(() => {
     if (empleadoAutenticado) {
       axios.get('http://localhost:8080/api/campanas').then(res => setCampanas(res.data)).catch(console.error);
       axios.get('http://localhost:8080/api/deudores').then(res => setDeudores(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/deudas').then(res => setDeudas(res.data)).catch(console.error);
-      cargarGestiones();
+      recargarDatosDinamicos(); // Carga inicial
     }
   }, [empleadoAutenticado]);
 
-  // --- FUNCIÓN DE LOGIN ---
   const handleLogin = (e) => {
     e.preventDefault();
-    // Validación simulada en frontend. 
     if (loginId === '1' && loginPass === 'admin123') {
-      setEmpleadoAutenticado({
-        idEmpleado: parseInt(loginId),
-        nombre: 'Alex',
-        rol: 'Gestor de Cobranza'
-      });
+      setEmpleadoAutenticado({ idEmpleado: parseInt(loginId), nombre: 'Alex', rol: 'Gestor de Cobranza' });
       setLoginError('');
     } else {
       setLoginError('Credenciales inválidas. Usa ID: 1 y Contraseña: admin123');
@@ -90,24 +85,14 @@ function App() {
             <form onSubmit={handleLogin} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">ID de Empleado</label>
-                <input 
-                  type="number" value={loginId} onChange={(e) => setLoginId(e.target.value)}
-                  required placeholder="Ej. 1"
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <input type="number" value={loginId} onChange={(e) => setLoginId(e.target.value)} required placeholder="Ej. 1" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
               </div>
               <div>
                 <label className="block text-sm font-semibold text-slate-600 mb-1">Contraseña</label>
-                <input 
-                  type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
-                  required placeholder="admin123"
-                  className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                />
+                <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)} required placeholder="admin123" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
               </div>
               {loginError && <p className="text-red-500 text-sm font-bold">{loginError}</p>}
-              <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">
-                Entrar al Sistema
-              </button>
+              <button type="submit" className="w-full bg-slate-800 hover:bg-slate-900 text-white font-bold py-3 px-4 rounded-lg transition-colors mt-4">Entrar al Sistema</button>
             </form>
           </div>
         </div>
@@ -126,13 +111,13 @@ function App() {
         </div>
         
         <nav className="flex-1 px-3 py-6 space-y-2">
+          <button onClick={() => setVistaActual('agenda')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'agenda' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📅 Mi Agenda (Hoy)</button>
           <button onClick={() => setVistaActual('gestion')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'gestion' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📞 Panel de Gestión</button>
           <button onClick={() => setVistaActual('dashboard')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📊 Dashboard KPIs</button>
           <button onClick={() => setVistaActual('cartera')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'cartera' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Cartera Completa</button>
           <button onClick={() => setVistaActual('campanas')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'campanas' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🏢 Campañas Activas</button>
         </nav>
         
-        {/* Mostramos los datos reales del empleado logueado */}
         <div className="p-4 border-t border-slate-800 flex justify-between items-center">
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold uppercase">
@@ -152,6 +137,78 @@ function App() {
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto">
           
+          {/* --- PANTALLA: MI AGENDA --- */}
+          {vistaActual === 'agenda' && (
+            <div className="animate-fade-in">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-3xl font-extrabold text-slate-800">Mi Agenda de Trabajo</h2>
+                <div className="bg-blue-100 text-blue-800 font-bold px-4 py-2 rounded-lg text-sm border border-blue-200 shadow-sm">
+                  Hoy: {new Date().toLocaleDateString('es-MX', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                </div>
+              </div>
+
+              {/* Motor de filtrado en tiempo real */}
+              {(() => {
+                // 1. Obtenemos la fecha de hoy en formato YYYY-MM-DD (para cruzarlo con el input date)
+                const today = new Date();
+                const yyyy = today.getFullYear();
+                const mm = String(today.getMonth() + 1).padStart(2, '0');
+                const dd = String(today.getDate()).padStart(2, '0');
+                const hoyISO = `${yyyy}-${mm}-${dd}`;
+
+                // 2. Buscamos las gestiones que sean promesa y venzan HOY
+                const promesasHoy = gestiones.filter(g => 
+                  g.codigoResultado === 'Promesa de Pago' && 
+                  g.fechaPromesa === hoyISO
+                );
+
+                // 3. Extraemos los IDs de las deudas que tienen esa promesa
+                const idsDeudasConPromesaHoy = promesasHoy.map(g => g.deuda?.idDeuda);
+
+                // 4. Filtramos la cartera para obtener solo a los deudores dueños de esas deudas
+                const deudoresAgenda = deudores.filter(deudor => {
+                  const deudasDelDeudor = deudas.filter(d => d.deudor.idDeudor === deudor.idDeudor);
+                  return deudasDelDeudor.some(d => idsDeudasConPromesaHoy.includes(d.idDeuda));
+                });
+
+                // Si la lista está vacía, el agente no tiene llamadas pendientes hoy
+                if (deudoresAgenda.length === 0) {
+                  return (
+                    <div className="bg-green-50 border border-green-200 p-10 rounded-xl shadow-sm text-center">
+                      <div className="text-6xl mb-4">🎉</div>
+                      <h3 className="text-2xl font-bold text-green-800 mb-2">¡Agenda Libre!</h3>
+                      <p className="text-green-600 font-semibold">No tienes llamadas programadas ni promesas por cobrar para el día de hoy.</p>
+                    </div>
+                  );
+                }
+
+                // Si hay deudores, los mostramos
+                return (
+                  <div className="space-y-6">
+                    <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded text-blue-800 font-bold text-sm shadow-sm">
+                      ⚠️ Tienes {deudoresAgenda.length} cliente(s) con promesa de pago agendada para hoy. ¡Es momento de llamarles!
+                    </div>
+                    
+                    <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                      {deudoresAgenda.map(deudor => (
+                        <DeudorCard 
+                          key={deudor.idDeudor} 
+                          deudor={deudor} 
+                          deudas={deudas} 
+                          gestiones={gestiones} 
+                          pagos={pagos} 
+                          onDatosActualizados={recargarDatosDinamicos} 
+                          empleadoActual={empleadoAutenticado} 
+                        />
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* --- PANTALLA: GESTIÓN --- */}
           {vistaActual === 'gestion' && (
             <div className="animate-fade-in">
               <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Buscador de Clientes</h2>
@@ -169,12 +226,12 @@ function App() {
 
               {deudorBuscado && (
                 <div className="mt-4">
-                  {/* Pasamos el empleado a la tarjeta del deudor */}
                   <DeudorCard 
                     deudor={deudorBuscado} 
                     deudas={deudas} 
                     gestiones={gestiones} 
-                    onGestionAgregada={cargarGestiones} 
+                    pagos={pagos} 
+                    onDatosActualizados={recargarDatosDinamicos} 
                     empleadoActual={empleadoAutenticado} 
                   />
                 </div>
@@ -190,6 +247,7 @@ function App() {
             </div>
           )}
 
+          {/* --- PANTALLA: DASHBOARD --- */}
           {vistaActual === 'dashboard' && (
             <div className="animate-fade-in">
               <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Métricas Globales</h2>
@@ -197,6 +255,7 @@ function App() {
             </div>
           )}
 
+          {/* --- PANTALLA: CARTERA COMPLETA --- */}
           {vistaActual === 'cartera' && (
             <div className="animate-fade-in">
               <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Cartera Activa</h2>
@@ -208,7 +267,8 @@ function App() {
                       deudor={deudor} 
                       deudas={deudas} 
                       gestiones={gestiones} 
-                      onGestionAgregada={cargarGestiones} 
+                      pagos={pagos} 
+                      onDatosActualizados={recargarDatosDinamicos} 
                       empleadoActual={empleadoAutenticado} 
                     />
                   ))}
@@ -217,6 +277,7 @@ function App() {
             </div>
           )}
 
+          {/* --- PANTALLA: CAMPAÑAS --- */}
           {vistaActual === 'campanas' && (
             <div className="animate-fade-in">
               <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Portafolios Asignados</h2>

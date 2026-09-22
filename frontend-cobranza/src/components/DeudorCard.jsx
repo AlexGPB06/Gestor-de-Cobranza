@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import GestionForm from './GestionForm';
+import PagoForm from './PagoForm';
 
-export default function DeudorCard({ deudor, deudas, gestiones, onGestionAgregada, empleadoActual }) {
+export default function DeudorCard({ deudor, deudas, gestiones, pagos, onDatosActualizados, empleadoActual }) {
   const [tabActiva, setTabActiva] = useState('info'); 
   
   const deudasDelDeudor = deudas.filter(d => d.deudor.idDeudor === deudor.idDeudor);
@@ -46,65 +47,84 @@ export default function DeudorCard({ deudor, deudas, gestiones, onGestionAgregad
       
       <div className="p-5 flex-grow bg-white">
         
+        {/* PESTAÑA 1: INFORMACIÓN FINANCIERA, PAGOS Y ESTADO DE CUENTA */}
         {tabActiva === 'info' && (
           <div className="animate-fade-in">
             {deudasDelDeudor.length === 0 ? (
               <p className="text-sm text-slate-400 italic">Sin productos registrados.</p>
             ) : (
               <ul className="space-y-6">
-                {deudasDelDeudor.map(deuda => (
-                  <li key={deuda.idDeuda} className="bg-slate-50 border border-slate-200 rounded-lg shadow-sm overflow-hidden">
-                    <div className="p-4 border-b border-slate-200">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div>
-                          <span className="block text-xs font-semibold text-slate-500 uppercase">Producto / Cuenta</span>
-                          <span className="text-sm font-mono font-bold text-slate-800">{deuda.numeroCuenta}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="block text-xs font-semibold text-slate-500 uppercase">Días de Mora</span>
-                          <span className="text-sm font-bold text-orange-600">90 días</span> 
-                        </div>
-                      </div>
-                    </div>
+                {deudasDelDeudor.map(deuda => {
+                  // Filtramos los pagos reales que pertenecen a esta cuenta específica
+                  const pagosDeLaDeuda = pagos ? pagos.filter(p => p.deuda && p.deuda.idDeuda === deuda.idDeuda) : [];
 
-                    <div className="p-4 bg-white">
-                      <h4 className="text-xs font-bold text-slate-400 uppercase mb-3">Estado de Cuenta (CXC)</h4>
-                      <div className="flex justify-between items-center mb-2">
-                        <span className="text-sm text-slate-600">Saldo Original Otorgado:</span>
-                        <span className="text-sm font-semibold text-slate-700">$35,000.00</span> 
+                  return (
+                    <li key={deuda.idDeuda} className="bg-white border border-slate-200 rounded-lg shadow-sm overflow-hidden">
+                      
+                      <div className="p-4 border-b border-slate-200 bg-slate-50">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div>
+                            <span className="block text-xs font-semibold text-slate-500 uppercase">Producto / Cuenta</span>
+                            <span className="text-sm font-mono font-bold text-slate-800">{deuda.numeroCuenta}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-xs font-semibold text-slate-500 uppercase">Estado</span>
+                            {deuda.saldoPendiente > 0 ? (
+                              <span className="text-sm font-bold text-orange-600">En Mora</span> 
+                            ) : (
+                              <span className="text-sm font-bold text-green-600">Liquidado</span> 
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex justify-between items-center mb-4">
-                        <span className="text-sm text-slate-600">Intereses Moratorios:</span>
-                        <span className="text-sm font-semibold text-slate-700">$1,500.50</span> 
-                      </div>
-                      <div className="flex justify-between items-end pt-3 border-t border-slate-100">
-                        <span className="text-sm font-bold text-slate-800">Saldo Total Exigible:</span>
-                        <span className="text-2xl font-black text-red-600">
-                          ${deuda.saldoPendiente.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                        </span>
-                      </div>
-                    </div>
 
-                    <div className="p-4 bg-slate-100 border-t border-slate-200">
-                      <h4 className="text-xs font-bold text-slate-500 uppercase mb-3">Últimos Pagos (Referenciales)</h4>
-                      <ul className="space-y-2">
-                        <li className="flex justify-between text-xs p-2 bg-white rounded border border-slate-200">
-                          <span className="text-slate-600">15/08/2026 - Transferencia SPEI</span>
-                          <span className="font-bold text-green-600">-$5,000.00</span>
-                        </li>
-                        <li className="flex justify-between text-xs p-2 bg-white rounded border border-slate-200">
-                          <span className="text-slate-600">20/07/2026 - Pago en OXXO</span>
-                          <span className="font-bold text-green-600">-$6,000.00</span>
-                        </li>
-                      </ul>
-                    </div>
-                  </li>
-                ))}
+                      <div className="p-5 bg-white">
+                        <div className="flex justify-between items-end mb-2">
+                          <span className="text-sm font-bold text-slate-800">Saldo Pendiente Actual:</span>
+                          <span className={`text-3xl font-black ${deuda.saldoPendiente > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                            ${deuda.saldoPendiente.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </span>
+                        </div>
+                        
+                        <PagoForm 
+                          deudaId={deuda.idDeuda} 
+                          saldoRestante={deuda.saldoPendiente} 
+                          onPagoExitoso={onDatosActualizados} 
+                        />
+
+                        {/* MÓDULO NUEVO: HISTORIAL DE PAGOS REALES */}
+                        <div className="mt-5 pt-4 border-t border-slate-200">
+                          <h4 className="text-[11px] font-bold text-slate-500 uppercase mb-3 tracking-wider">Historial de Pagos Aplicados</h4>
+                          {pagosDeLaDeuda.length === 0 ? (
+                            <p className="text-xs text-slate-400 italic">El cliente aún no ha registrado abonos en esta cuenta.</p>
+                          ) : (
+                            <ul className="space-y-2">
+                              {pagosDeLaDeuda.map(pago => (
+                                <li key={pago.idPago} className="flex justify-between items-center p-2.5 bg-slate-50 rounded-lg border border-slate-100">
+                                  <div className="flex flex-col">
+                                    <span className="text-xs font-bold text-slate-700">{pago.metodoPago}</span>
+                                    <span className="text-[10px] font-semibold text-slate-400">
+                                      {new Date(pago.fechaRegistro).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute:'2-digit' })}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-black text-green-600">
+                                    +${pago.monto.toLocaleString('es-MX', { minimumFractionDigits: 2 })}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
         )}
 
+        {/* PESTAÑA 2: CAPTURA DE GESTIÓN Y BITÁCORA */}
         {tabActiva === 'gestion' && (
           <div className="animate-fade-in">
              {deudasDelDeudor.map(deuda => {
@@ -118,7 +138,7 @@ export default function DeudorCard({ deudor, deudas, gestiones, onGestionAgregad
                   
                   <GestionForm 
                     deudaId={deuda.idDeuda} 
-                    onGestionAgregada={onGestionAgregada} 
+                    onGestionAgregada={onDatosActualizados} 
                     diasMaximos={diasMaximosCampaña}
                     empleadoActual={empleadoActual}
                   />
@@ -136,6 +156,12 @@ export default function DeudorCard({ deudor, deudas, gestiones, onGestionAgregad
                               </span>
                             </div>
                             <p className="text-sm text-slate-600 italic">"{gestion.comentarios}"</p>
+                            
+                            {gestion.montoPromesa && (
+                              <div className="mt-2 inline-block bg-green-100 text-green-800 text-[11px] font-bold px-2 py-1 rounded">
+                                💵 Promesa de ${gestion.montoPromesa.toLocaleString('es-MX')} para el {gestion.fechaPromesa}
+                              </div>
+                            )}
                           </li>
                         ))}
                       </ul>
@@ -147,6 +173,7 @@ export default function DeudorCard({ deudor, deudas, gestiones, onGestionAgregad
           </div>
         )}
 
+        {/* PESTAÑA 3: HISTORIAL DE PROMESAS */}
         {tabActiva === 'promesas' && (
           <div className="animate-fade-in">
             {promesasDelDeudor.length === 0 ? (
