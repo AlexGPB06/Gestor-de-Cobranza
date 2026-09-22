@@ -1,13 +1,30 @@
 import { useState } from 'react';
 import axios from 'axios';
 
-// Recibimos la función onGestionAgregada
-export default function GestionForm({ deudaId, onGestionAgregada }) {
+export default function GestionForm({ deudaId, onGestionAgregada, diasMaximos, empleadoActual }) {
   const [comentarios, setComentarios] = useState('');
   const [codigoResultado, setCodigoResultado] = useState('Promesa de Pago');
   const [montoPromesa, setMontoPromesa] = useState('');
   const [fechaPromesa, setFechaPromesa] = useState('');
   const [loading, setLoading] = useState(false);
+  const [alertaFecha, setAlertaFecha] = useState(false);
+
+  const handleFechaChange = (e) => {
+    const seleccionada = e.target.value;
+    setFechaPromesa(seleccionada);
+
+    if (seleccionada && diasMaximos) {
+      const hoy = new Date();
+      const limite = new Date();
+      limite.setDate(hoy.getDate() + diasMaximos);
+
+      const fechaComparar = new Date(seleccionada + 'T00:00:00'); 
+      
+      setAlertaFecha(fechaComparar > limite);
+    } else {
+      setAlertaFecha(false);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -17,7 +34,8 @@ export default function GestionForm({ deudaId, onGestionAgregada }) {
       comentarios: comentarios,
       codigoResultado: codigoResultado,
       deuda: { idDeuda: deudaId },
-      empleado: { idEmpleado: 1 }
+      // ¡Aquí está la magia! Ya no es un 1 fijo, es el ID del agente logueado.
+      empleado: { idEmpleado: empleadoActual.idEmpleado } 
     };
 
     if (codigoResultado === 'Promesa de Pago') {
@@ -30,11 +48,8 @@ export default function GestionForm({ deudaId, onGestionAgregada }) {
         setComentarios('');
         setMontoPromesa('');
         setFechaPromesa('');
-        
-        // Ejecutamos el puente para recargar el historial sin usar F5
-        if(onGestionAgregada) {
-          onGestionAgregada();
-        }
+        setAlertaFecha(false);
+        if(onGestionAgregada) onGestionAgregada();
       })
       .catch(error => {
         console.error("Error guardando la gestión:", error);
@@ -46,15 +61,13 @@ export default function GestionForm({ deudaId, onGestionAgregada }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="mt-3 bg-slate-100 p-3 rounded-lg border border-slate-200">
-      <h5 className="text-xs font-bold text-slate-700 mb-2 uppercase tracking-wide">Capturar Gestión</h5>
-      
-      <div className="mb-2">
+    <form onSubmit={handleSubmit} className="mt-3 bg-white p-4 rounded-lg border border-slate-200 shadow-sm">
+      <div className="mb-3">
         <label className="block text-[11px] font-semibold text-slate-500 mb-1">Resultado del Contacto</label>
         <select 
           value={codigoResultado} 
           onChange={(e) => setCodigoResultado(e.target.value)}
-          className="w-full p-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
+          className="w-full p-2 text-sm border border-slate-300 rounded bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
         >
           <option value="Promesa de Pago">Contacto Efectivo (Promesa)</option>
           <option value="Mensaje a Tercero">Mensaje a Tercero</option>
@@ -64,50 +77,47 @@ export default function GestionForm({ deudaId, onGestionAgregada }) {
       </div>
 
       {codigoResultado === 'Promesa de Pago' && (
-        <div className="flex gap-2 mb-2">
-          <div className="w-1/2">
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Monto a Pagar ($)</label>
-            <input 
-              type="number" 
-              step="0.01"
-              value={montoPromesa}
-              onChange={(e) => setMontoPromesa(e.target.value)}
-              required
-              placeholder="Ej. 1500.00"
-              className="w-full p-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
-            />
+        <div className="mb-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+          <div className="flex gap-3 mb-1">
+            <div className="w-1/2">
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Monto a Pagar ($)</label>
+              <input 
+                type="number" step="0.01" value={montoPromesa} onChange={(e) => setMontoPromesa(e.target.value)}
+                required placeholder="Ej. 1500.00"
+                className="w-full p-2 text-sm border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 focus:outline-none"
+              />
+            </div>
+            <div className="w-1/2">
+              <label className="block text-[11px] font-semibold text-slate-600 mb-1">Fecha Promesa</label>
+              <input 
+                type="date" value={fechaPromesa} onChange={handleFechaChange}
+                required
+                className={`w-full p-2 text-sm border rounded focus:ring-2 focus:outline-none ${alertaFecha ? 'border-red-500 focus:ring-red-500 bg-red-50' : 'border-slate-300 focus:ring-blue-500'}`}
+              />
+            </div>
           </div>
-          <div className="w-1/2">
-            <label className="block text-[11px] font-semibold text-slate-500 mb-1">Fecha Promesa</label>
-            <input 
-              type="date" 
-              value={fechaPromesa}
-              onChange={(e) => setFechaPromesa(e.target.value)}
-              required
-              className="w-full p-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white text-slate-600"
-            />
-          </div>
+          {alertaFecha && (
+            <p className="text-xs text-red-600 font-bold mt-1 bg-red-100 p-1.5 rounded">
+              ⚠️ Aviso: La fecha seleccionada supera los lineamientos permitidos por la campaña.
+            </p>
+          )}
         </div>
       )}
 
-      <div className="mb-3">
+      <div className="mb-4">
         <label className="block text-[11px] font-semibold text-slate-500 mb-1">Notas del Agente</label>
         <textarea 
-          value={comentarios}
-          onChange={(e) => setComentarios(e.target.value)}
-          required
-          rows="2"
-          className="w-full p-1.5 text-sm border border-slate-300 rounded focus:outline-none focus:border-blue-500 bg-white"
-          placeholder="Ej. El titular se compromete a liquidar el viernes..."
+          value={comentarios} onChange={(e) => setComentarios(e.target.value)}
+          required rows="2" placeholder="Ej. El titular se compromete a liquidar..."
+          className="w-full p-2 text-sm border border-slate-300 rounded bg-slate-50 focus:bg-white focus:ring-2 focus:ring-blue-500 focus:outline-none"
         ></textarea>
       </div>
 
       <button 
-        type="submit" 
-        disabled={loading}
-        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-1.5 px-3 rounded text-sm transition-colors disabled:bg-blue-300"
+        type="submit" disabled={loading}
+        className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded text-sm transition-colors shadow-sm disabled:bg-blue-300"
       >
-        {loading ? 'Guardando...' : 'Guardar Gestión'}
+        {loading ? 'Guardando...' : 'Registrar Gestión'}
       </button>
     </form>
   );

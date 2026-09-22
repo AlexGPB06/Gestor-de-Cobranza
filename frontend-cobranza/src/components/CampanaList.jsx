@@ -12,9 +12,7 @@ export default function CampanaList({ campanas }) {
         >
           <div>
             <h3 className="text-lg font-bold text-slate-800">{campana.nombreEmpresa}</h3>
-            <p className="text-sm text-slate-600 mt-1">
-              <span className="font-semibold">Días máximos para promesa:</span> {campana.diasMaximosPromesa} días
-            </p>
+            {/* Se eliminó la línea que mostraba los días máximos */}
           </div>
           <span className={`mt-3 sm:mt-0 px-3 py-1 text-xs font-bold rounded-full ${campana.activo ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
             {campana.activo ? 'Activa' : 'Inactiva'}
