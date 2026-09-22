@@ -1,0 +1,40 @@
+name: CI/CD Pipeline y Seguridad ZAP
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-security-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout del código
+      uses: actions/checkout@v3
+
+    - name: Configurar Java JDK
+      uses: actions/setup-java@v3
+      with:
+        java-version: '21' # Ajusta según la versión soportada por GitHub Actions
+        distribution: 'temurin'
+
+    - name: Dar permisos al Maven Wrapper
+      run: chmod +x mvnw
+
+    - name: Compilar y Ejecutar Pruebas Unitarias
+      run: ./mvnw test
+
+    - name: Levantar Spring Boot en segundo plano (Test Environment)
+      run: nohup ./mvnw spring-boot:run &
+      env:
+        # En un entorno real, las contraseñas se guardan en GitHub Secrets
+        DB_PASSWORD: ${{ secrets.DB_PASSWORD }} 
+
+    - name: Esperar a que el servidor inicie
+      run: sleep 30
+
+    - name: Escaneo de Seguridad con OWASP ZAP (Baseline)
+      uses: zaproxy/action-baseline@v0.10.0
+      with:
+        target: 'http://localhost:8080/api/empleados/login'
+        fail_action: false # Evita que el pipeline falle si encuentra vulnerabilidades menores
