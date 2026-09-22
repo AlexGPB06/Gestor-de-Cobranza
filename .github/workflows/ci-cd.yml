@@ -10,24 +10,27 @@ jobs:
 
     steps:
     - name: Checkout del código
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4 # Actualizado para quitar el warning de deprecación
 
     - name: Configurar Java JDK
-      uses: actions/setup-java@v3
+      uses: actions/setup-java@v4 # Actualizado para la versión más reciente
       with:
-        java-version: '21' # Ajusta según la versión soportada por GitHub Actions
+        java-version: '25' # Alineado con la versión de tu pom.xml
         distribution: 'temurin'
 
     - name: Dar permisos al Maven Wrapper
       run: chmod +x mvnw
+      working-directory: ./saas-cobranza # Le indicamos dónde está el archivo
 
     - name: Compilar y Ejecutar Pruebas Unitarias
       run: ./mvnw test
+      working-directory: ./saas-cobranza # Le indicamos dónde compilar
 
     - name: Levantar Spring Boot en segundo plano (Test Environment)
       run: nohup ./mvnw spring-boot:run &
+      working-directory: ./saas-cobranza
       env:
-        # En un entorno real, las contraseñas se guardan en GitHub Secrets
+        # Aquí inyectas la variable si usas secrets, de lo contrario la pones en duro para la prueba
         DB_PASSWORD: ${{ secrets.DB_PASSWORD }} 
 
     - name: Esperar a que el servidor inicie
@@ -37,4 +40,4 @@ jobs:
       uses: zaproxy/action-baseline@v0.10.0
       with:
         target: 'http://localhost:8080/api/empleados/login'
-        fail_action: false # Evita que el pipeline falle si encuentra vulnerabilidades menores
+        fail_action: false
