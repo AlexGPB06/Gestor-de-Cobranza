@@ -60,6 +60,12 @@
 			<scope>test</scope>
 		</dependency>
 		
+		<!-- Hashing de contraseñas (BCrypt) -->
+		<dependency>
+			<groupId>org.springframework.security</groupId>
+			<artifactId>spring-security-crypto</artifactId>
+		</dependency>
+
 		<!-- Dependencia general de pruebas (incluye JUnit 5 y Mockito) -->
 		<dependency>
 			<groupId>org.springframework.boot</groupId>

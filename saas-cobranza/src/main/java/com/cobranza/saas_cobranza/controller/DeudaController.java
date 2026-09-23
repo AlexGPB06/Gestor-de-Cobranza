@@ -15,7 +15,10 @@ public class DeudaController {
     private DeudaRepository deudaRepository;
 
     @GetMapping
-    public List<Deuda> obtenerTodas() {
+    public List<Deuda> obtenerTodas(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return deudaRepository.findByDeudor_Campana_Empresa_IdEmpresa(empresaId);
+        }
         return deudaRepository.findAll();
     }
 

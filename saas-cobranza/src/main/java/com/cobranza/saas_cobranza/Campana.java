@@ -13,6 +13,10 @@ public class Campana {
     @Column(name = "id_campana")
     private Long idCampana;
 
+    @ManyToOne
+    @JoinColumn(name = "id_empresa")
+    private Empresa empresa;
+
     @Column(name = "nombre_empresa", nullable = false)
     private String nombreEmpresa;
 

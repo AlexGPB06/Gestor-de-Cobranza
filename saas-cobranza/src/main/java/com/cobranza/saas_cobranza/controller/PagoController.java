@@ -22,7 +22,10 @@ public class PagoController {
     private DeudaRepository deudaRepository;
 
     @GetMapping
-    public List<Pago> listarPagos() {
+    public List<Pago> listarPagos(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return pagoRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId);
+        }
         return pagoRepository.findAll();
     }
 

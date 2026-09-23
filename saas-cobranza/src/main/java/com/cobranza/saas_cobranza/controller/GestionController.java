@@ -15,7 +15,10 @@ public class GestionController {
     private GestionRepository gestionRepository;
 
     @GetMapping
-    public List<Gestion> obtenerTodas() {
+    public List<Gestion> obtenerTodas(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return gestionRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId);
+        }
         return gestionRepository.findAll();
     }
 

@@ -15,7 +15,10 @@ public class CampanaController {
     private CampanaRepository campanaRepository;
 
     @GetMapping
-    public List<Campana> obtenerTodas() {
+    public List<Campana> obtenerTodas(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return campanaRepository.findByEmpresa_IdEmpresa(empresaId);
+        }
         return campanaRepository.findAll();
     }
 
