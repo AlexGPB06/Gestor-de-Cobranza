@@ -21,6 +21,10 @@ public class Deuda {
     @JoinColumn(name = "id_deudor", nullable = false)
     private Deudor deudor;
 
+    @ManyToOne
+    @JoinColumn(name = "id_tipo_producto")
+    private TipoProducto tipoProducto;
+
     @Column(name = "numero_cuenta", nullable = false, unique = true)
     private String numeroCuenta;
 

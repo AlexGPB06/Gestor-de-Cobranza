@@ -15,7 +15,10 @@ public class ConceptoController {
     private ConceptoRepository repository;
 
     @GetMapping
-    public List<Concepto> listarTodos() {
+    public List<Concepto> listarTodos(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return repository.findByCampana_Empresa_IdEmpresaAndActivoTrue(empresaId);
+        }
         return repository.findAll();
     }
 

@@ -15,7 +15,10 @@ public class TipoProductoController {
     private TipoProductoRepository repository;
 
     @GetMapping
-    public List<TipoProducto> listarTodos() {
+    public List<TipoProducto> listarTodos(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return repository.findByCampana_Empresa_IdEmpresa(empresaId);
+        }
         return repository.findAll();
     }
 

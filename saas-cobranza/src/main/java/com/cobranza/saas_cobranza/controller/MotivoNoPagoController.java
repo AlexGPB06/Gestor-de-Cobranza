@@ -15,7 +15,10 @@ public class MotivoNoPagoController {
     private MotivoNoPagoRepository repository;
 
     @GetMapping
-    public List<MotivoNoPago> listarTodos() {
+    public List<MotivoNoPago> listarTodos(@RequestParam(required = false) Long empresaId) {
+        if (empresaId != null) {
+            return repository.findByCampana_Empresa_IdEmpresa(empresaId);
+        }
         return repository.findAll();
     }
 

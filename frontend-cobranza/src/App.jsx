@@ -1,12 +1,17 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
-import DeudorCard from './components/DeudorCard';
+import InfoGestion from './components/InfoGestion';
+import CarteraGestor from './components/CarteraGestor';
+import MiMeta from './components/MiMeta';
+import MiMetaEquipo from './components/MiMetaEquipo';
 import CampanaList from './components/CampanaList';
-import DashboardKPI from './components/DashboardKPI';
 import CatalogosManager from './components/CatalogosManager';
 import AuditoriaViewer from './components/AuditoriaViewer';
 import AsignacionCartera from './components/AsignacionCartera';
 import EmpleadosManager from './components/EmpleadosManager';
+import SupervisionPanel from './components/SupervisionPanel';
+import AsignacionSupervisor from './components/AsignacionSupervisor';
+import PromesasSupervisor from './components/PromesasSupervisor';
 
 function App() {
   // --- ESTADO DE AUTENTICACIÓN ---
@@ -27,28 +32,50 @@ function App() {
   const [deudores, setDeudores] = useState([]);
   const [deudas, setDeudas] = useState([]);
   const [gestiones, setGestiones] = useState([]);
+  const [conceptos, setConceptos] = useState([]);
+  const [motivos, setMotivos] = useState([]);
+  const [asignaciones, setAsignaciones] = useState([]);
   const [pagos, setPagos] = useState([]);
+  const [tiposPromesa, setTiposPromesa] = useState([]);
+  const [tiposTicket, setTiposTicket] = useState([]);
+  const [tickets, setTickets] = useState([]);
 
   // --- ESTADOS DE UI ---
-  const [vistaActual, setVistaActual] = useState('gestion');
+  const [vistaActual, setVistaActual] = useState('info');
+  const [tabInfo, setTabInfo] = useState('info'); // submenú dentro de Info/Gestión: info | gestion | pagos
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [deudorBuscado, setDeudorBuscado] = useState(null);
+  const [deudaSeleccionadaId, setDeudaSeleccionadaId] = useState(null);
   const [mensajeBusqueda, setMensajeBusqueda] = useState('');
 
   const recargarDatosDinamicos = () => {
-    const params = empleadoAutenticado?.idEmpresa ? { params: { empresaId: empleadoAutenticado.idEmpresa } } : {};
-    axios.get('http://localhost:8080/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
+    if (!empleadoAutenticado) return;
+    const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
+    const paramsGestor = { params: { empleadoId: empleadoAutenticado.idEmpleado } };
     axios.get('http://localhost:8080/api/gestiones', params).then(res => setGestiones(res.data)).catch(console.error);
     axios.get('http://localhost:8080/api/pagos', params).then(res => setPagos(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/asignaciones-cartera', paramsGestor).then(res => setAsignaciones(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/tickets', params).then(res => setTickets(res.data)).catch(console.error);
   };
 
   useEffect(() => {
     if (empleadoAutenticado) {
-      const params = empleadoAutenticado.idEmpresa ? { params: { empresaId: empleadoAutenticado.idEmpresa } } : {};
-      axios.get('http://localhost:8080/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
+      const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
       axios.get('http://localhost:8080/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/tipos-promesa', params).then(res => setTiposPromesa(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/tipos-ticket', params).then(res => setTiposTicket(res.data)).catch(console.error);
+      axios.get('http://localhost:8080/api/asignaciones-cartera', { params: { empleadoId: empleadoAutenticado.idEmpleado } }).then(res => setAsignaciones(res.data)).catch(console.error);
       recargarDatosDinamicos();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [empleadoAutenticado]);
+
+  useEffect(() => {
+    recargarDatosDinamicos();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empleadoAutenticado]);
 
@@ -107,41 +134,51 @@ function App() {
 
   const cerrarSesion = () => {
     setEmpleadoAutenticado(null);
-    setVistaActual('gestion');
+    setVistaActual('info');
+    setTabInfo('info');
     setDeudorBuscado(null);
+    setDeudaSeleccionadaId(null);
     setTerminoBusqueda('');
   };
 
-  const buscarCliente = (e) => {
+  const limpiarSeleccion = () => {
+    setDeudorBuscado(null);
+    setDeudaSeleccionadaId(null);
+    setMensajeBusqueda('');
+  };
+
+  const buscarPorCuenta = (e) => {
     e.preventDefault();
     setMensajeBusqueda('');
     const termino = (terminoBusqueda || '').trim().toLowerCase();
     let encontrado = null;
 
     if (termino) {
-      const deudaPorCuenta = deudas.find(d => d.numeroCuenta && d.numeroCuenta.toLowerCase().includes(termino));
+      const deudaPorCuenta = deudas.find(d => d.numeroCuenta && d.numeroCuenta.toLowerCase() === termino);
       if (deudaPorCuenta) {
         const idDeudor = deudaPorCuenta.deudor?.idDeudor ?? deudaPorCuenta.idDeudor;
         encontrado = deudores.find(d =>
           d.idDeudor === idDeudor || d.idDeudor?.toString() === idDeudor?.toString()
         );
       }
-      if (!encontrado) {
-        encontrado = deudores.find(d =>
-          (d.documentoIdentidad && d.documentoIdentidad.toLowerCase().includes(termino)) ||
-          (d.telefonoPrincipal && d.telefonoPrincipal.includes(termino)) ||
-          (d.nombreCompleto && d.nombreCompleto.toLowerCase().includes(termino)) ||
-          d.idDeudor?.toString() === termino ||
-          d.id?.toString() === termino
-        );
-      }
     }
 
-    if (encontrado) setDeudorBuscado(encontrado);
-    else {
+    if (encontrado) {
+      setDeudorBuscado(encontrado);
+      const deudasDelCliente = deudas.filter(d => d.deudor?.idDeudor === encontrado.idDeudor);
+      setDeudaSeleccionadaId(deudasDelCliente.length > 0 ? deudasDelCliente[0].idDeuda : null);
+    } else {
       setDeudorBuscado(null);
-      setMensajeBusqueda('No se encontró ningún cliente con ese dato. Verifica el identificador.');
+      setDeudaSeleccionadaId(null);
+      setMensajeBusqueda('No se encontró ningún producto con ese número. Verifica el identificador.');
     }
+  };
+
+  const seleccionarParaGestion = (deudor, deudaId) => {
+    setDeudorBuscado(deudor);
+    setDeudaSeleccionadaId(deudaId || null);
+    setVistaActual('info');
+    setTabInfo('gestion');
   };
 
   // --- VISTA 1: PANTALLA DE LOGIN / ACTIVACIÓN ---
@@ -152,7 +189,7 @@ function App() {
           <div className="bg-blue-600 md:w-1/2 p-10 text-white flex flex-col justify-center">
             <h1 className="text-4xl font-black mb-4">Sistema BPO</h1>
             <p className="text-blue-100 text-lg">
-              Portal Operativo de Cobranza. Ingresa tus credenciales o activa tu cuenta con el código proporcionado por Recursos Humanos.
+              Gestión de Cobranza. Ingresa tus credenciales o activa tu cuenta con el código proporcionado por Recursos Humanos.
             </p>
           </div>
           
@@ -217,18 +254,21 @@ function App() {
       <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-10 flex-shrink-0">
         <div className="p-5 bg-slate-950 border-b border-slate-800">
           <h1 className="text-xl font-black text-white tracking-tight">Sistema BPO</h1>
-          <p className="text-xs text-slate-500 mt-1">Portal Operativo</p>
+          <p className="text-xs text-slate-500 mt-1">Gestión/Info</p>
           {empleadoAutenticado.empresa && (
             <p className="text-[11px] mt-2 bg-blue-600/30 text-blue-200 rounded px-2 py-1 font-bold text-center">{empleadoAutenticado.empresa}</p>
           )}
         </div>
         
         <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
-          <button onClick={() => setVistaActual('agenda')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'agenda' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📅 Mi Agenda (Hoy)</button>
-          <button onClick={() => setVistaActual('gestion')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'gestion' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📞 Panel de Gestión</button>
-          <button onClick={() => setVistaActual('dashboard')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'dashboard' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>📊 Dashboard KPIs</button>
-          <button onClick={() => setVistaActual('cartera')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'cartera' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Cartera Completa</button>
-          <button onClick={() => setVistaActual('campanas')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'campanas' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🏢 Campañas Activas</button>
+          <div className="mb-1">
+            <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Gestión/Info</p>
+            <button onClick={() => setVistaActual('info')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'info' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Info/Gestión</button>
+            {empleadoAutenticado.rol !== 'SUPERVISOR' && (
+              <button onClick={() => setVistaActual('cartera')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'cartera' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Mi Cartera</button>
+            )}
+            <button onClick={() => setVistaActual('meta')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'meta' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>{empleadoAutenticado.rol === 'SUPERVISOR' ? '🎯 Meta del Equipo' : '🎯 Mi Meta'}</button>
+          </div>
 
           {empleadoAutenticado.rol === 'ADMINISTRADOR' && (
             <div className="pt-4 mt-4 border-t border-slate-800">
@@ -237,6 +277,16 @@ function App() {
               <button onClick={() => setVistaActual('asignacion')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'asignacion' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Asignar Cartera</button>
               <button onClick={() => setVistaActual('catalogos')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'catalogos' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>⚙️ Catálogos Operativos</button>
               <button onClick={() => setVistaActual('auditoria')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'auditoria' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🛡️ Bitácora de Auditoría</button>
+              <button onClick={() => setVistaActual('campanas')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'campanas' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🏢 Campañas Activas</button>
+            </div>
+          )}
+
+          {empleadoAutenticado.rol === 'SUPERVISOR' && (
+            <div className="pt-4 mt-4 border-t border-slate-800">
+              <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Supervisión</p>
+              <button onClick={() => setVistaActual('supervision')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'supervision' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👁️ Monitoreo de Equipo</button>
+              <button onClick={() => setVistaActual('asignacionSup')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'asignacionSup' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Asignar Carteras</button>
+              <button onClick={() => setVistaActual('promesasSup')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'promesasSup' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🎁 Promesas del Equipo</button>
             </div>
           )}
         </nav>
@@ -259,43 +309,53 @@ function App() {
 
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto">
-          {vistaActual === 'agenda' && <div className="animate-fade-in">{/* ... Contenido de Agenda ... */}</div>}
-          {vistaActual === 'gestion' && (
-            <div className="animate-fade-in">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Buscador de Clientes</h2>
-              <form onSubmit={buscarCliente} className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm mb-8 flex flex-col md:flex-row gap-4">
-                <div className="flex-1">
-                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">Buscar por Número de Cuenta, Nombre, Teléfono o ID</label>
-                  <input type="text" value={terminoBusqueda} onChange={(e) => setTerminoBusqueda(e.target.value)} placeholder="Ej. TDC-456789" className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"/>
-                </div>
-                <div className="flex items-end">
-                  <button type="submit" className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg transition-colors h-[46px]">Buscar Expediente</button>
-                </div>
-              </form>
-              {mensajeBusqueda && <div className="bg-red-50 text-red-700 p-4 rounded-lg border border-red-100 mb-6 font-semibold text-center">{mensajeBusqueda}</div>}
-              {deudorBuscado && <div className="mt-4"><DeudorCard deudor={deudorBuscado} deudas={deudas} gestiones={gestiones} pagos={pagos} onDatosActualizados={recargarDatosDinamicos} empleadoActual={empleadoAutenticado} /></div>}
-              {!deudorBuscado && !mensajeBusqueda && (
-                <div className="text-center py-20 text-slate-400">
-                  <div className="text-6xl mb-4">🎧</div>
-                  <p className="text-lg font-semibold">Esperando llamada...</p>
-                </div>
-              )}
-            </div>
+          {vistaActual === 'info' && (
+            <InfoGestion
+              terminoBusqueda={terminoBusqueda}
+              onTerminoChange={setTerminoBusqueda}
+              onBuscar={buscarPorCuenta}
+              mensajeBusqueda={mensajeBusqueda}
+              deudorBuscado={deudorBuscado}
+              limpiarSeleccion={limpiarSeleccion}
+              deudas={deudas}
+              deudaSeleccionadaId={deudaSeleccionadaId}
+              onCambiarDeuda={setDeudaSeleccionadaId}
+              gestiones={gestiones}
+              conceptos={conceptos}
+              motivos={motivos}
+              empleadoActual={empleadoAutenticado}
+              onGestionAgregada={recargarDatosDinamicos}
+              pagos={pagos}
+              tab={tabInfo}
+              setTab={setTabInfo}
+              tiposPromesa={tiposPromesa}
+              tickets={tickets}
+              tiposTicket={tiposTicket}
+              onDatosActualizados={recargarDatosDinamicos}
+            />
           )}
-          {vistaActual === 'dashboard' && <div className="animate-fade-in"><DashboardKPI deudas={deudas} gestiones={gestiones} /></div>}
           {vistaActual === 'cartera' && (
-            <div className="animate-fade-in">
-              <h2 className="text-3xl font-extrabold text-slate-800 mb-6">Cartera Activa</h2>
-              <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
-                {deudores.map(deudor => <DeudorCard key={deudor.idDeudor || deudor.id} deudor={deudor} deudas={deudas} gestiones={gestiones} pagos={pagos} onDatosActualizados={recargarDatosDinamicos} empleadoActual={empleadoAutenticado} />)}
-              </div>
-            </div>
+            <CarteraGestor
+              asignaciones={asignaciones}
+              onSeleccionar={seleccionarParaGestion}
+            />
           )}
-          {vistaActual === 'campanas' && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
+          {vistaActual === 'meta' && (empleadoAutenticado.rol === 'SUPERVISOR' ? (
+            <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />
+          ) : (
+            <MiMeta
+              empleadoActual={empleadoAutenticado}
+              gestiones={gestiones}
+            />
+          ))}
+          {vistaActual === 'campanas' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
           {vistaActual === 'empleados' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><EmpleadosManager empresaId={empleadoAutenticado.idEmpresa} /></div>}
           {vistaActual === 'asignacion' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><AsignacionCartera empresaId={empleadoAutenticado.idEmpresa} /></div>}
           {vistaActual === 'catalogos' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><CatalogosManager /></div>}
           {vistaActual === 'auditoria' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><AuditoriaViewer /></div>}
+          {vistaActual === 'supervision' && empleadoAutenticado.rol === 'SUPERVISOR' && <SupervisionPanel supervisorId={empleadoAutenticado.idEmpleado} />}
+          {vistaActual === 'asignacionSup' && empleadoAutenticado.rol === 'SUPERVISOR' && <AsignacionSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
+          {vistaActual === 'promesasSup' && empleadoAutenticado.rol === 'SUPERVISOR' && <PromesasSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
         </div>
       </main>
     </div>

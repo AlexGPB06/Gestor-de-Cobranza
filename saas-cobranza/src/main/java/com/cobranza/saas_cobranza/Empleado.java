@@ -32,12 +32,20 @@ public class Empleado {
     @JoinColumn(name = "id_empresa")
     private Empresa empresa;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "id_supervisor")
+    private Empleado supervisor;
+
     @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     @Column(name = "contrasena_hash", length = 255)
     private String contrasenaHash;
 
     @Column(name = "activo")
     private Boolean activo;
+
+    @ManyToOne
+    @JoinColumn(name = "id_departamento")
+    private Departamento departamento;
 
     @Column(name = "fecha_creacion")
     private LocalDateTime fechaCreacion;
@@ -71,11 +79,17 @@ public class Empleado {
     public Empresa getEmpresa() { return empresa; }
     public void setEmpresa(Empresa empresa) { this.empresa = empresa; }
 
+    public Empleado getSupervisor() { return supervisor; }
+    public void setSupervisor(Empleado supervisor) { this.supervisor = supervisor; }
+
     public String getContrasenaHash() { return contrasenaHash; }
     public void setContrasenaHash(String contrasenaHash) { this.contrasenaHash = contrasenaHash; }
 
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }
+
+    public Departamento getDepartamento() { return departamento; }
+    public void setDepartamento(Departamento departamento) { this.departamento = departamento; }
 
     public LocalDateTime getFechaCreacion() { return fechaCreacion; }
     public void setFechaCreacion(LocalDateTime fechaCreacion) { this.fechaCreacion = fechaCreacion; }

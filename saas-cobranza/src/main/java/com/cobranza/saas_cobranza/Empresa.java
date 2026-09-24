@@ -18,6 +18,9 @@ public class Empresa {
     @Column(name = "rfc", length = 20)
     private String rfc;
 
+    @Column(name = "tipo", length = 30)
+    private String tipo;
+
     @Column(name = "activo")
     private Boolean activo = true;
 
@@ -39,6 +42,9 @@ public class Empresa {
 
     public String getRfc() { return rfc; }
     public void setRfc(String rfc) { this.rfc = rfc; }
+
+    public String getTipo() { return tipo; }
+    public void setTipo(String tipo) { this.tipo = tipo; }
 
     public Boolean getActivo() { return activo; }
     public void setActivo(Boolean activo) { this.activo = activo; }

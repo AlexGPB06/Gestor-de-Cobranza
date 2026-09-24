@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
+import java.util.List;
 
 @Data
 @Entity
@@ -18,6 +20,10 @@ public class Deudor {
     @ManyToOne
     @JoinColumn(name = "id_campana", nullable = false)
     private Campana campana;
+
+    @OneToMany(mappedBy = "deudor", fetch = FetchType.EAGER, orphanRemoval = true)
+    @OrderBy("idTelefono ASC")
+    private List<Telefono> telefonos = new ArrayList<>();
 
     @Column(name = "nombre_completo", nullable = false)
     private String nombreCompleto;

@@ -1,5 +1,6 @@
 package com.cobranza.saas_cobranza;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -13,6 +14,7 @@ public class Telefono {
     @Column(name = "id_telefono")
     private Long idTelefono;
 
+    @JsonIgnore
     @ManyToOne
     @JoinColumn(name = "id_deudor", nullable = false)
     private Deudor deudor;

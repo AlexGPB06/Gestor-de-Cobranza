@@ -1,11 +1,18 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 
+const formatearDinero = (n) => {
+  const num = Number(n);
+  if (Number.isNaN(num)) return '$0.00';
+  return '$' + num.toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
 export default function AsignacionCartera({ empresaId }) {
   const [empleados, setEmpleados] = useState([]);
-  const [deudores, setDeudores] = useState([]);
+  const [deudas, setDeudas] = useState([]);
+  const [asignacionesExistentes, setAsignacionesExistentes] = useState([]);
   const [gestorSeleccionado, setGestorSeleccionado] = useState('');
-  const [deudoresSeleccionados, setDeudoresSeleccionados] = useState([]);
+  const [deudasSeleccionadas, setDeudasSeleccionadas] = useState([]);
   const [notificacion, setNotificacion] = useState({ tipo: '', mensaje: '' });
   const [cargando, setCargando] = useState(false);
 
@@ -13,12 +20,14 @@ export default function AsignacionCartera({ empresaId }) {
     try {
       const params = empresaId ? { params: { empresaId } } : {};
       const resEmpleados = await axios.get('http://localhost:8080/api/empleados', params);
-      const resDeudores = await axios.get('http://localhost:8080/api/deudores', params);
-      
-      const gestores = resEmpleados.data.filter(emp => emp.activo === true); 
-      
+      const resDeudas = await axios.get('http://localhost:8080/api/deudas', params);
+      const resAsignaciones = await axios.get('http://localhost:8080/api/asignaciones-cartera', params);
+
+      const gestores = resEmpleados.data.filter(emp => emp.activo === true);
+
       setEmpleados(gestores);
-      setDeudores(resDeudores.data);
+      setDeudas(resDeudas.data);
+      setAsignacionesExistentes(resAsignaciones.data);
     } catch (error) {
       console.error("Error al cargar datos para asignación:", error);
       setNotificacion({ tipo: 'error', mensaje: 'Error al conectar con la base de datos.' });
@@ -31,19 +40,25 @@ export default function AsignacionCartera({ empresaId }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaId]);
 
-  const handleCheckboxChange = (idDeudor) => {
-    if (deudoresSeleccionados.includes(idDeudor)) {
-      setDeudoresSeleccionados(deudoresSeleccionados.filter(id => id !== idDeudor));
+  const deudaAsignadaA = (idDeuda) => {
+    const asig = asignacionesExistentes.find(a => a.deuda?.idDeuda === idDeuda && a.estatusActiva === true);
+    return asig ? asig.empleado : null;
+  };
+
+  const handleCheckboxChange = (idDeuda) => {
+    if (deudasSeleccionadas.includes(idDeuda)) {
+      setDeudasSeleccionadas(deudasSeleccionadas.filter(id => id !== idDeuda));
     } else {
-      setDeudoresSeleccionados([...deudoresSeleccionados, idDeudor]);
+      setDeudasSeleccionadas([...deudasSeleccionadas, idDeuda]);
     }
   };
 
-  const seleccionarTodos = () => {
-    if (deudoresSeleccionados.length === deudores.length) {
-      setDeudoresSeleccionados([]); // Deseleccionar todos
+  const seleccionarTodas = () => {
+    const disponibles = deudas.filter(d => !deudaAsignadaA(d.idDeuda));
+    if (deudasSeleccionadas.length === disponibles.length) {
+      setDeudasSeleccionadas([]);
     } else {
-      setDeudoresSeleccionados(deudores.map(d => d.idDeudor || d.id)); // Seleccionar todos
+      setDeudasSeleccionadas(disponibles.map(d => d.idDeuda));
     }
   };
 
@@ -53,8 +68,14 @@ export default function AsignacionCartera({ empresaId }) {
       setNotificacion({ tipo: 'error', mensaje: 'Por favor, selecciona un gestor.' });
       return;
     }
-    if (deudoresSeleccionados.length === 0) {
-      setNotificacion({ tipo: 'error', mensaje: 'Debes seleccionar al menos un cliente para asignar.' });
+    if (deudasSeleccionadas.length === 0) {
+      setNotificacion({ tipo: 'error', mensaje: 'Debes seleccionar al menos una cuenta (producto) para asignar.' });
+      return;
+    }
+
+    const yaAsignadas = deudasSeleccionadas.filter(id => deudaAsignadaA(id));
+    if (yaAsignadas.length > 0) {
+      setNotificacion({ tipo: 'error', mensaje: 'Alguna de las cuentas seleccionadas ya está asignada a un gestor.' });
       return;
     }
 
@@ -62,21 +83,21 @@ export default function AsignacionCartera({ empresaId }) {
     setNotificacion({ tipo: '', mensaje: '' });
 
     try {
-      // Enviar la asignación registro por registro (o puedes usar un endpoint bulk si tu backend lo soporta)
-      const promesas = deudoresSeleccionados.map(idDeudor => 
+      const promesas = deudasSeleccionadas.map(idDeuda =>
         axios.post('http://localhost:8080/api/asignaciones-cartera', {
           empleado: { idEmpleado: gestorSeleccionado },
-          deudor: { idDeudor: idDeudor },
+          deuda: { idDeuda: idDeuda },
           fechaAsignacion: new Date().toISOString().split('T')[0],
           estatusActiva: true
         })
       );
 
       await Promise.all(promesas);
-      
-      setNotificacion({ tipo: 'exito', mensaje: `¡Se asignaron ${deudoresSeleccionados.length} clientes al gestor exitosamente!` });
-      setDeudoresSeleccionados([]); // Limpiar selección
+
+      setNotificacion({ tipo: 'exito', mensaje: `¡Se asignaron ${deudasSeleccionadas.length} cuentas al gestor exitosamente!` });
+      setDeudasSeleccionadas([]);
       setGestorSeleccionado('');
+      cargarDatos();
     } catch (error) {
       console.error("Error al asignar cartera:", error);
       setNotificacion({ tipo: 'error', mensaje: 'Ocurrió un error al guardar las asignaciones. Revisa la consola.' });
@@ -85,11 +106,13 @@ export default function AsignacionCartera({ empresaId }) {
     }
   };
 
+  const disponibles = deudas.filter(d => !deudaAsignadaA(d.idDeuda));
+
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-slate-800">Asignación de Cartera</h2>
-        <p className="text-sm text-slate-500 mt-1">Distribuye los clientes disponibles a los gestores operativos.</p>
+        <p className="text-sm text-slate-500 mt-1">Distribuye las cuentas (productos) disponibles a los gestores operativos. Las cuentas ya asignadas se marcan con el gestor actual.</p>
       </div>
 
       {notificacion.mensaje && (
@@ -102,8 +125,8 @@ export default function AsignacionCartera({ empresaId }) {
         <div className="bg-slate-50 p-5 rounded-lg border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 items-end">
           <div className="flex-1 w-full">
             <label className="block text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">1. Selecciona al Gestor</label>
-            <select 
-              value={gestorSeleccionado} 
+            <select
+              value={gestorSeleccionado}
               onChange={(e) => setGestorSeleccionado(e.target.value)}
               className="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
             >
@@ -116,8 +139,8 @@ export default function AsignacionCartera({ empresaId }) {
             </select>
           </div>
           <div className="w-full md:w-auto">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               disabled={cargando}
               className={`w-full font-bold py-3 px-8 rounded-lg transition-colors ${cargando ? 'bg-slate-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}
             >
@@ -128,44 +151,63 @@ export default function AsignacionCartera({ empresaId }) {
 
         <div className="border border-slate-200 rounded-lg overflow-hidden">
           <div className="bg-slate-100 px-4 py-3 border-b border-slate-200 flex justify-between items-center">
-            <span className="font-bold text-slate-700">Cartera de Clientes ({deudores.length})</span>
-            <button type="button" onClick={seleccionarTodos} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
-              {deudoresSeleccionados.length === deudores.length ? 'Deseleccionar Todos' : 'Seleccionar Todos'}
+            <span className="font-bold text-slate-700">Cuentas de la Cartera ({deudas.length})</span>
+            <button type="button" onClick={seleccionarTodas} className="text-sm font-semibold text-blue-600 hover:text-blue-800">
+              {deudasSeleccionadas.length === disponibles.length ? 'Deseleccionar Todas' : 'Seleccionar Todas (libres)'}
             </button>
           </div>
-          
+
           <div className="max-h-96 overflow-y-auto">
             <table className="min-w-full divide-y divide-slate-200 text-sm">
               <thead className="bg-slate-50 sticky top-0">
                 <tr>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase w-12">Sel.</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">ID / Cliente</th>
-                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">Contacto</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">Cuenta / Producto</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">Cliente</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">Saldo</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase">Asignación Actual</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
-                {deudores.length === 0 ? (
-                  <tr><td colSpan="3" className="px-6 py-8 text-center text-slate-500 italic">No hay clientes registrados en el sistema.</td></tr>
+                {deudas.length === 0 ? (
+                  <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500 italic">No hay cuentas registradas para esta empresa.</td></tr>
                 ) : (
-                  deudores.map((deudor) => {
-                    const id = deudor.idDeudor || deudor.id;
-                    const isChecked = deudoresSeleccionados.includes(id);
+                  deudas.map((deuda) => {
+                    const id = deuda.idDeuda;
+                    const isChecked = deudasSeleccionadas.includes(id);
+                    const asignada = deudaAsignadaA(id);
+                    const esActiva = deuda.saldoPendiente > 0;
                     return (
-                      <tr key={id} className={isChecked ? 'bg-blue-50' : 'hover:bg-slate-50'}>
+                      <tr key={id} className={`${isChecked ? 'bg-blue-50' : 'hover:bg-slate-50'} ${asignada ? 'opacity-60' : ''}`}>
                         <td className="px-6 py-4">
-                          <input 
-                            type="checkbox" 
-                            checked={isChecked} 
-                            onChange={() => handleCheckboxChange(id)}
-                            className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                          />
+                          {asignada ? (
+                            <span className="text-slate-300">☑️</span>
+                          ) : (
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={() => handleCheckboxChange(id)}
+                              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                            />
+                          )}
                         </td>
                         <td className="px-6 py-4">
-                          <div className="font-mono text-xs text-slate-400">#{id}</div>
-                          <div className="font-bold text-slate-800">{deudor.nombreCompleto}</div>
+                          <div className="font-mono text-sm font-black text-slate-800">{deuda.numeroCuenta}</div>
+                          <div className="text-[11px] text-slate-500">{deuda.tipoProducto?.nombreProducto || 'Sin tipo'}</div>
                         </td>
-                        <td className="px-6 py-4 text-slate-600">
-                          {deudor.telefonoPrincipal || 'Sin teléfono'}
+                        <td className="px-6 py-4">
+                          <div className="font-bold text-slate-800">{deuda.deudor?.nombreCompleto || 'Sin cliente'}</div>
+                          <div className="text-[11px] text-slate-500">{deuda.deudor?.documentoIdentidad || ''}</div>
+                        </td>
+                        <td className="px-6 py-4">
+                          <span className={`font-bold ${esActiva ? 'text-red-600' : 'text-green-600'}`}>{formatearDinero(deuda.saldoPendiente)}</span>
+                        </td>
+                        <td className="px-6 py-4">
+                          {asignada ? (
+                            <span className="inline-block text-[11px] font-black px-2 py-1 rounded bg-slate-200 text-slate-700">→ {asignada.nombreCompleto || `ID ${asignada.idEmpleado}`}</span>
+                          ) : (
+                            <span className="text-[11px] text-slate-400 font-semibold">Libre</span>
+                          )}
                         </td>
                       </tr>
                     );
@@ -174,6 +216,11 @@ export default function AsignacionCartera({ empresaId }) {
               </tbody>
             </table>
           </div>
+          {disponibles.length < deudas.length && (
+            <p className="bg-slate-50 border-t border-slate-200 px-4 py-2 text-[11px] text-slate-500">
+              {deudas.length - disponibles.length} cuenta(s) ya asignadas (deshabilitadas).
+            </p>
+          )}
         </div>
       </form>
     </div>

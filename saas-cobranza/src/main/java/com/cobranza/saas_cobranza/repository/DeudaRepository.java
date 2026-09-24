@@ -9,4 +9,6 @@ import java.util.List;
 public interface DeudaRepository extends JpaRepository<Deuda, Long> {
 
     List<Deuda> findByDeudor_Campana_Empresa_IdEmpresa(Long idEmpresa);
+
+    boolean existsByNumeroCuenta(String numeroCuenta);
 }
