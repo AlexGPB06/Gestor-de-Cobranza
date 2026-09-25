@@ -1,5 +1,6 @@
 package com.cobranza.saas_cobranza.util;
 
+import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
 import io.jsonwebtoken.security.Keys;
@@ -30,5 +31,52 @@ public class JwtUtil {
                 .setExpiration(new Date(System.currentTimeMillis() + TIEMPO_EXPIRACION))
                 .signWith(CLAVE_FIRMA, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    public static Sesion autenticar(String cabeceraAuthorization) {
+        if (cabeceraAuthorization == null || cabeceraAuthorization.isBlank()) {
+            return null;
+        }
+        if (!cabeceraAuthorization.startsWith("Bearer ")) {
+            return null;
+        }
+        String token = cabeceraAuthorization.substring(7).trim();
+        if (token.isEmpty()) {
+            return null;
+        }
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(CLAVE_FIRMA)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
+            String sujeto = claims.getSubject();
+            if (sujeto == null || sujeto.isBlank()) {
+                return null;
+            }
+            return new Sesion(
+                    Long.valueOf(sujeto),
+                    claims.get("rol", String.class),
+                    claims.get("usuario", String.class),
+                    claims.get("numeroEmpleado", String.class));
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public record Sesion(Long idEmpleado, String rol, String usuario, String numeroEmpleado) {
+
+        public boolean tieneRol(String... rolespermitidos) {
+            if (rol == null || rol.isBlank()) {
+                return false;
+            }
+            String actual = rol.trim().toUpperCase();
+            for (String permitido : rolespermitidos) {
+                if (actual.equals(permitido.trim().toUpperCase())) {
+                    return true;
+                }
+            }
+            return false;
+        }
     }
 }

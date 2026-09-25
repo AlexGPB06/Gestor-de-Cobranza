@@ -4,6 +4,7 @@ import com.cobranza.saas_cobranza.repository.*;
 import com.cobranza.saas_cobranza.util.PasswordUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -18,6 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
+@ConditionalOnProperty(name = "saas.cobranza.semillas", havingValue = "true", matchIfMissing = true)
 public class DataSeeder implements CommandLineRunner {
 
     @Autowired

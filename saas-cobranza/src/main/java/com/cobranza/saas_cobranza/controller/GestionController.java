@@ -4,12 +4,17 @@ import com.cobranza.saas_cobranza.Gestion;
 import com.cobranza.saas_cobranza.Telefono;
 import com.cobranza.saas_cobranza.Deuda;
 import com.cobranza.saas_cobranza.Concepto;
+import com.cobranza.saas_cobranza.Empleado;
+import com.cobranza.saas_cobranza.Meta;
 import com.cobranza.saas_cobranza.TipoPromesa;
 import com.cobranza.saas_cobranza.repository.GestionRepository;
 import com.cobranza.saas_cobranza.repository.TelefonoRepository;
 import com.cobranza.saas_cobranza.repository.DeudaRepository;
 import com.cobranza.saas_cobranza.repository.ConceptoRepository;
+import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
+import com.cobranza.saas_cobranza.repository.MetaRepository;
 import com.cobranza.saas_cobranza.repository.TipoPromesaRepository;
+import com.cobranza.saas_cobranza.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +30,10 @@ import java.util.Optional;
 @RequestMapping("/api/gestiones")
 public class GestionController {
 
+    private static final String ROL_ADMIN = "ADMINISTRADOR";
+    private static final String ROL_SUPERVISOR = "SUPERVISOR";
+    private static final String ROL_GESTOR = "GESTOR";
+
     @Autowired
     private GestionRepository gestionRepository;
 
@@ -39,6 +48,12 @@ public class GestionController {
 
     @Autowired
     private TipoPromesaRepository tipoPromesaRepository;
+
+    @Autowired
+    private EmpleadoRepository empleadoRepository;
+
+    @Autowired
+    private MetaRepository metaRepository;
 
     @GetMapping
     public List<Gestion> obtenerTodas(@RequestParam(required = false) Long empresaId,
@@ -72,10 +87,40 @@ public class GestionController {
     }
 
     @PostMapping
-    public ResponseEntity<?> crearGestion(@RequestBody Gestion gestion) {
+    public ResponseEntity<?> crearGestion(
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Gestion gestion) {
+
+        JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
+        if (sesion == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token ausente o inválido");
+        }
+        if (sesion.tieneRol(ROL_SUPERVISOR)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("El supervisor solo puede dar de alta metas");
+        }
+        if (!sesion.tieneRol(ROL_GESTOR, ROL_ADMIN)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Solo el gestor o el administrador pueden registrar gestiones");
+        }
+
+        Empleado empleadoAutenticado = empleadoRepository.findById(sesion.idEmpleado()).orElse(null);
+        if (empleadoAutenticado == null || !Boolean.TRUE.equals(empleadoAutenticado.getActivo())) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("El empleado del token no está activo");
+        }
+        gestion.setEmpleado(empleadoAutenticado);
+
         // --- Validación de promesas ---
         Long idDeuda = gestion.getDeuda() != null ? gestion.getDeuda().getIdDeuda() : null;
         Long idConcepto = gestion.getConcepto() != null ? gestion.getConcepto().getIdConcepto() : null;
+
+        Deuda deudaBD = null;
+        if (idDeuda != null) {
+            deudaBD = deudaRepository.findById(idDeuda).orElse(null);
+            if (deudaBD == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La deuda no existe");
+            }
+        }
 
         if (idDeuda != null && idConcepto != null) {
             Concepto concepto = conceptoRepository.findById(idConcepto).orElse(null);
@@ -89,11 +134,6 @@ public class GestionController {
                 }
 
                 // a) Ventana de días permitida según la campaña (empresa)
-                Deuda deudaBD = deudaRepository.findById(idDeuda).orElse(null);
-                if (deudaBD == null) {
-                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                            .body("La deuda no existe.");
-                }
                 Integer diasMaximos = (deudaBD.getDeudor() != null && deudaBD.getDeudor().getCampana() != null)
                         ? deudaBD.getDeudor().getCampana().getDiasMaximosPromesa()
                         : null;
@@ -111,6 +151,27 @@ public class GestionController {
                             .body("Ya existe una promesa vigente para este producto. No se puede registrar otra promesa hasta que venza.");
                 }
             }
+        }
+
+        // --- Validación de promesa ---
+        if (gestion.getMeta() != null && gestion.getMeta().getIdMeta() != null) {
+            Meta meta = metaRepository.findById(gestion.getMeta().getIdMeta()).orElse(null);
+            if (meta == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La meta no existe");
+            }
+            if (!Boolean.TRUE.equals(meta.getActivo())) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La meta no está activa");
+            }
+            if (idDeuda != null) {
+                Long campanaDeuda = (deudaBD.getDeudor() != null && deudaBD.getDeudor().getCampana() != null)
+                        ? deudaBD.getDeudor().getCampana().getIdCampana() : null;
+                Long campanaMeta = meta.getCampana() != null ? meta.getCampana().getIdCampana() : null;
+                if (campanaDeuda != null && campanaMeta != null && !campanaDeuda.equals(campanaMeta)) {
+                    return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                            .body("La meta y la deuda pertenecen a campañas distintas");
+                }
+            }
+            gestion.setMeta(meta);
         }
 
         // --- Guardado ---

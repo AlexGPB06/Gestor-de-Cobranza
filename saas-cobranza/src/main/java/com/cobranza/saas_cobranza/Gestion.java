@@ -26,6 +26,10 @@ public class Gestion {
     private Empleado empleado;
 
     @ManyToOne
+    @JoinColumn(name = "id_meta")
+    private Meta meta;
+
+    @ManyToOne
     @JoinColumn(name = "id_concepto")
     private Concepto concepto;
 
