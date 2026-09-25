@@ -22,4 +22,8 @@ public interface GestionRepository extends JpaRepository<Gestion, Long> {
     List<Gestion> findByEmpleado_IdEmpleadoInAndFechaRegistroGreaterThanEqual(Collection<Long> idsEmpleado, LocalDateTime desde);
 
     List<Gestion> findByMeta_IdMeta(Long idMeta);
+
+    List<Gestion> findByDeuda_IdDeuda(Long idDeuda);
+
+    long countByDeuda_IdDeuda(Long idDeuda);
 }

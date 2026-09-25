@@ -68,6 +68,10 @@ public class Gestion {
     @Column(name = "fecha_registro", nullable = false, updatable = false)
     private LocalDateTime fechaRegistro;
 
+    @Version
+    @Column(name = "version")
+    private Integer version;
+
     @PrePersist
     protected void onCreate() {
         this.fechaRegistro = LocalDateTime.now(ZoneOffset.UTC);

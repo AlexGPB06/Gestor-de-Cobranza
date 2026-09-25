@@ -95,7 +95,7 @@ class GestionPromesaTest {
         Deuda deuda = new Deuda();
         deuda.setIdDeuda(ID_DEUDA);
         deuda.setDeudor(deudor);
-        when(deudaRepository.findById(ID_DEUDA)).thenReturn(Optional.of(deuda));
+        when(deudaRepository.findByIdBloqueado(ID_DEUDA)).thenReturn(Optional.of(deuda));
     }
 
     private String tokenGestor() {
@@ -191,7 +191,7 @@ class GestionPromesaTest {
 
     @Test
     void crearGestion_DeudaInexistente_DeberiaRetornar400() {
-        when(deudaRepository.findById(999999L)).thenReturn(Optional.empty());
+        when(deudaRepository.findByIdBloqueado(999999L)).thenReturn(Optional.empty());
 
         Gestion gestion = new Gestion();
         Deuda deuda = new Deuda();

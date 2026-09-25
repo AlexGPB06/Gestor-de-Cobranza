@@ -16,8 +16,11 @@ import com.cobranza.saas_cobranza.repository.MetaRepository;
 import com.cobranza.saas_cobranza.repository.TipoPromesaRepository;
 import com.cobranza.saas_cobranza.util.JwtUtil;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Isolation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -87,6 +90,7 @@ public class GestionController {
     }
 
     @PostMapping
+    @Transactional(isolation = Isolation.READ_COMMITTED)
     public ResponseEntity<?> crearGestion(
             @RequestHeader(value = "Authorization", required = false) String authorization,
             @RequestBody Gestion gestion) {
@@ -116,7 +120,7 @@ public class GestionController {
 
         Deuda deudaBD = null;
         if (idDeuda != null) {
-            deudaBD = deudaRepository.findById(idDeuda).orElse(null);
+            deudaBD = deudaRepository.findByIdBloqueado(idDeuda).orElse(null);
             if (deudaBD == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La deuda no existe");
             }
@@ -174,6 +178,13 @@ public class GestionController {
             gestion.setMeta(meta);
         }
 
+        // --- Validación de montos ---
+        if (gestion.getMontoPagado() != null && gestion.getMontoPromesa() != null
+                && gestion.getMontoPagado().compareTo(gestion.getMontoPromesa()) > 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El monto pagado no puede superar el monto prometido");
+        }
+
         // --- Guardado ---
         if (gestion.getEstadoBonificacion() == null && esTipoPromocionConvenio(gestion)) {
             gestion.setEstadoBonificacion("PENDIENTE");
@@ -204,7 +215,14 @@ public class GestionController {
         return gestion.getDeuda() != null ? gestion.getDeuda().getIdDeuda() : null;
     }
 
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<?> manejarActualizacionSimultanea(OptimisticLockingFailureException e) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body("Otro usuario actualizó esta gestión al mismo tiempo. Vuelve a cargarla e intenta de nuevo.");
+    }
+
     @PutMapping("/{id}/monto-pagado")
+    @Transactional
     public ResponseEntity<?> actualizarMontoPagado(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {
@@ -212,16 +230,26 @@ public class GestionController {
         }
         Gestion gestion = gestionOpt.get();
         Object valor = body.get("montoPagado");
+        BigDecimal montoPagado;
         try {
-            gestion.setMontoPagado(valor == null ? BigDecimal.ZERO : new BigDecimal(valor.toString()));
+            montoPagado = valor == null ? BigDecimal.ZERO : new BigDecimal(valor.toString());
         } catch (NumberFormatException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El monto pagado no es válido");
         }
+        if (montoPagado.signum() < 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El monto pagado no puede ser negativo");
+        }
+        if (gestion.getMontoPromesa() != null && montoPagado.compareTo(gestion.getMontoPromesa()) > 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El monto pagado no puede superar el monto prometido");
+        }
+        gestion.setMontoPagado(montoPagado);
         Gestion actualizada = gestionRepository.save(gestion);
         return ResponseEntity.ok(actualizada);
     }
 
     @PutMapping("/{id}/estado-bonificacion")
+    @Transactional
     public ResponseEntity<?> actualizarEstadoBonificacion(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {
@@ -241,6 +269,7 @@ public class GestionController {
     }
 
     @PutMapping("/{id}/promesa")
+    @Transactional
     public ResponseEntity<?> modificarPromesa(@PathVariable Long id, @RequestBody Map<String, Object> body) {
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {

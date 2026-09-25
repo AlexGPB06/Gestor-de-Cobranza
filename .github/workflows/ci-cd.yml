@@ -1,43 +1,227 @@
-name: CI/CD Pipeline y Seguridad ZAP
+name: CI/CD
 
 on:
   push:
+    branches: [ "main", "Ver2" ]
+  pull_request:
     branches: [ "main" ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-and-security-scan:
+  backend:
+    name: Backend (compilar y pruebas)
     runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: saas_cobranza_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/saas_cobranza_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SAAS_COBRANZA_SEMILLAS: "false"
 
     steps:
-    - name: Checkout del código
-      uses: actions/checkout@v4 # Actualizado para quitar el warning de deprecación
+      - name: Checkout del código
+        uses: actions/checkout@v4
 
-    - name: Configurar Java JDK
-      uses: actions/setup-java@v4 # Actualizado para la versión más reciente
-      with:
-        java-version: '25' # Alineado con la versión de tu pom.xml
-        distribution: 'temurin'
+      - name: Detectar versión de Java del pom.xml
+        id: java
+        run: echo "version=$(sed -n 's:.*<java.version>\(.*\)</java.version>.*:\1:p' saas-cobranza/pom.xml | head -1)" >> "$GITHUB_OUTPUT"
 
-    - name: Dar permisos al Maven Wrapper
-      run: chmod +x mvnw
-      working-directory: ./saas-cobranza # Le indicamos dónde está el archivo
+      - name: Configurar Java JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: ${{ steps.java.outputs.version }}
+          distribution: temurin
+          cache: maven
+          cache-dependency-path: saas-cobranza/pom.xml
 
-    - name: Compilar y Ejecutar Pruebas Unitarias
-      run: ./mvnw test
-      working-directory: ./saas-cobranza # Le indicamos dónde compilar
+      - name: Dar permisos al Maven Wrapper
+        run: chmod +x mvnw
+        working-directory: ./saas-cobranza
 
-    - name: Levantar Spring Boot en segundo plano (Test Environment)
-      run: nohup ./mvnw spring-boot:run &
-      working-directory: ./saas-cobranza
-      env:
-        # Aquí inyectas la variable si usas secrets, de lo contrario la pones en duro para la prueba
-        DB_PASSWORD: ${{ secrets.DB_PASSWORD }} 
+      - name: Verificar que MySQL responde
+        run: |
+          for i in $(seq 1 30); do
+            if docker exec ${{ job.services.mysql.id }} mysqladmin ping -uroot -proot --silent; then
+              echo "MySQL listo"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "MySQL no respondió a tiempo"
+          exit 1
 
-    - name: Esperar a que el servidor inicie
-      run: sleep 30
+      - name: Compilar, ejecutar pruebas y empaquetar
+        run: ./mvnw -B -ntp verify
+        working-directory: ./saas-cobranza
 
-    - name: Escaneo de Seguridad con OWASP ZAP (Baseline)
-      uses: zaproxy/action-baseline@v0.10.0
-      with:
-        target: 'http://localhost:8080/api/empleados/login'
-        fail_action: false
+      - name: Resumen de pruebas en el resumen del job
+        if: always()
+        run: |
+          {
+            echo "### Resultados de pruebas (backend)"
+            echo ""
+            echo "| Clase | Pruebas | Fallos | Errores | Omitidas |"
+            echo "| --- | --- | --- | --- | --- |"
+            for f in saas-cobranza/target/surefire-reports/*.txt; do
+              [ -e "$f" ] || continue
+              line=$(grep -m1 'Tests run:' "$f" || true)
+              [ -n "$line" ] || continue
+              name=$(basename "$f" .txt)
+              nums=$(echo "$line" | sed -E 's/.*Tests run: ([0-9]+), Failures: ([0-9]+), Errors: ([0-9]+), Skipped: ([0-9]+).*/\1|\2|\3|\4/')
+              echo "| $name | $(echo "$nums" | cut -d'|' -f1) | $(echo "$nums" | cut -d'|' -f2) | $(echo "$nums" | cut -d'|' -f3) | $(echo "$nums" | cut -d'|' -f4) |"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Publicar reportes de Surefire
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: saas-cobranza/target/surefire-reports/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Publicar jar
+        uses: actions/upload-artifact@v4
+        with:
+          name: saas-cobranza-jar
+          path: saas-cobranza/target/*.jar
+          retention-days: 14
+          if-no-files-found: error
+
+  frontend:
+    name: Frontend (lint y build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: frontend-cobranza/package-lock.json
+
+      - name: Instalar dependencias
+        run: npm ci
+        working-directory: ./frontend-cobranza
+
+      - name: Lint
+        continue-on-error: true
+        run: npm run lint
+        working-directory: ./frontend-cobranza
+
+      - name: Build de producción
+        run: npm run build
+        working-directory: ./frontend-cobranza
+
+      - name: Publicar dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-cobranza/dist/
+          retention-days: 14
+          if-no-files-found: error
+
+  security:
+    name: Seguridad (OWASP ZAP)
+    runs-on: ubuntu-latest
+    needs: backend
+    timeout-minutes: 20
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: saas_cobranza_db
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -uroot -proot"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:mysql://localhost:3306/saas_cobranza_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SAAS_COBRANZA_SEMILLAS: "false"
+
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v4
+
+      - name: Descargar jar de la job anterior
+        uses: actions/download-artifact@v4
+        with:
+          name: saas-cobranza-jar
+          path: saas-cobranza/target
+
+      - name: Levantar la aplicación
+        run: |
+          nohup java -jar saas-cobranza/target/*.jar > app.log 2>&1 &
+          echo $! > app.pid
+
+      - name: Esperar a que la API responda
+        run: |
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' http://localhost:8080/api/tipos-promesa || true)
+            if [ "$code" = "200" ]; then
+              echo "API lista"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "La API no respondió a tiempo"
+          tail -50 app.log || true
+          exit 1
+
+      - name: Escaneo de Seguridad con OWASP ZAP (Baseline)
+        uses: zaproxy/action-baseline@v0.10.0
+        with:
+          target: http://localhost:8080/api/tipos-promesa
+          spider: 5
+          fail_action: false
+
+      - name: Publicar reporte de ZAP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: zap-report
+          path: "**/report.html"
+          retention-days: 14
+          if-no-files-found: ignore
+
+      - name: Detener la aplicación
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            kill "$(cat app.pid)" 2>/dev/null || true
+          fi

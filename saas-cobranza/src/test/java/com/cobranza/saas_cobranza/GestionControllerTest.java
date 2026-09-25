@@ -90,7 +90,7 @@ class GestionControllerTest {
         when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(gestor));
         Deuda deuda = new Deuda();
         deuda.setIdDeuda(1L);
-        when(deudaRepository.findById(1L)).thenReturn(Optional.of(deuda));
+        when(deudaRepository.findByIdBloqueado(1L)).thenReturn(Optional.of(deuda));
         when(gestionRepository.save(any(Gestion.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Gestion gestion = gestionBase();
@@ -144,7 +144,7 @@ class GestionControllerTest {
         Deuda deuda = new Deuda();
         deuda.setIdDeuda(1L);
         deuda.setDeudor(deudor);
-        when(deudaRepository.findById(1L)).thenReturn(Optional.of(deuda));
+        when(deudaRepository.findByIdBloqueado(1L)).thenReturn(Optional.of(deuda));
 
         Gestion gestion = gestionBase();
         gestion.setDeuda(deuda);
