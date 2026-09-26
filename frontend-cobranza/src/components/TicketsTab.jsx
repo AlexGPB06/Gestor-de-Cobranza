@@ -92,7 +92,7 @@ export default function TicketsTab({ deudor, deudas, tiposTicket, tickets, emple
       return;
     }
     setLoading(true);
-    axios.post('http://localhost:8080/api/tickets', {
+    axios.post('/api/tickets', {
       numero: tipoSeleccionado.numero,
       asunto: tipoSeleccionado.nombre,
       idDeuda: deudaId ? Number(deudaId) : null,

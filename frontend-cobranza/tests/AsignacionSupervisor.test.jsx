@@ -73,9 +73,9 @@ describe('AsignacionSupervisor: carga', () => {
     expect(screen.getByText('Cargando equipo y cartera disponible...')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Ana Torres')).toBeInTheDocument());
 
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/empleados', { params: { empresaId: 2 } });
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/deudas', { params: { empresaId: 2 } });
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/asignaciones-cartera', { params: { empresaId: 2 } });
+    expect(axios.get).toHaveBeenCalledWith('/api/empleados', { params: { empresaId: 2 } });
+    expect(axios.get).toHaveBeenCalledWith('/api/deudas', { params: { empresaId: 2 } });
+    expect(axios.get).toHaveBeenCalledWith('/api/asignaciones-cartera', { params: { empresaId: 2 } });
   });
 
   it('filtra gestores del equipo y excluye otros roles', async () => {
@@ -359,7 +359,7 @@ describe('AsignacionSupervisor: asignar', () => {
     await usuario.click(screen.getByRole('button', { name: /Asignar 2 cuenta/ }));
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/asignaciones-cartera/por-lote', {
+      expect(axios.post).toHaveBeenCalledWith('/api/asignaciones-cartera/por-lote', {
         empleadoId: 10,
         deudaIds: [1, 2],
       }),

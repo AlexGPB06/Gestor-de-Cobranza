@@ -73,10 +73,10 @@ describe('PromesasSupervisor: carga', () => {
     expect(screen.getByText('Cargando promesas...')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByText('Verónica Castillo')).toBeInTheDocument());
 
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/promesas', {
+    expect(axios.get).toHaveBeenCalledWith('/api/supervision/promesas', {
       params: { supervisorId: 9 },
     });
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/tipos-promesa', {
+    expect(axios.get).toHaveBeenCalledWith('/api/tipos-promesa', {
       params: { empresaId: 2 },
     });
   });
@@ -259,7 +259,7 @@ describe('PromesasSupervisor: aprobar y dar de baja', () => {
     await usuario.click(screen.getAllByRole('button', { name: /Aprobar/ })[0]);
 
     await waitFor(() =>
-      expect(axios.put).toHaveBeenCalledWith('http://localhost:8080/api/gestiones/1/estado-bonificacion', {
+      expect(axios.put).toHaveBeenCalledWith('/api/gestiones/1/estado-bonificacion', {
         estado: 'APROBADA',
       }),
     );
@@ -276,7 +276,7 @@ describe('PromesasSupervisor: aprobar y dar de baja', () => {
     await usuario.click(screen.getAllByRole('button', { name: /Dar de baja/ })[0]);
 
     await waitFor(() =>
-      expect(axios.put).toHaveBeenCalledWith('http://localhost:8080/api/gestiones/1/estado-bonificacion', {
+      expect(axios.put).toHaveBeenCalledWith('/api/gestiones/1/estado-bonificacion', {
         estado: 'RECHAZADA',
       }),
     );
@@ -354,7 +354,7 @@ describe('PromesasSupervisor: modificar', () => {
     await usuario.click(screen.getByRole('button', { name: /Guardar cambios/ }));
 
     await waitFor(() =>
-      expect(axios.put).toHaveBeenCalledWith('http://localhost:8080/api/gestiones/1/promesa', {
+      expect(axios.put).toHaveBeenCalledWith('/api/gestiones/1/promesa', {
         tipoPromesaId: 2,
         montoPromesa: 2500,
         fechaPromesa: '2026-04-01',

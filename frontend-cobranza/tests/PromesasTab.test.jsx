@@ -133,7 +133,7 @@ describe('PromesasTab: edicion del monto pagado', () => {
     await usuario.click(screen.getByRole('button', { name: 'OK' }));
 
     await waitFor(() => expect(actualizados).toHaveBeenCalledTimes(1));
-    expect(axios.put).toHaveBeenCalledWith('http://localhost:8080/api/gestiones/11/monto-pagado', {
+    expect(axios.put).toHaveBeenCalledWith('/api/gestiones/11/monto-pagado', {
       montoPagado: 500,
     });
     expect(screen.queryByRole('spinbutton')).toBeNull();

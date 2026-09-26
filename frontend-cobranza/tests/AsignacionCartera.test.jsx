@@ -69,7 +69,7 @@ describe('AsignacionCartera: carga', () => {
     render(<AsignacionCartera empresaId={7} />);
 
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/deudas', {
+      expect(axios.get).toHaveBeenCalledWith('/api/deudas', {
         params: { empresaId: 7 },
       }),
     );
@@ -240,7 +240,7 @@ describe('AsignacionCartera: guardado', () => {
 
     await waitFor(() => expect(axios.post).toHaveBeenCalledTimes(2));
     expect(axios.post).toHaveBeenCalledWith(
-      'http://localhost:8080/api/asignaciones-cartera',
+      '/api/asignaciones-cartera',
       expect.objectContaining({
         empleado: { idEmpleado: '90' },
         estatusActiva: true,

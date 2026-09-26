@@ -85,7 +85,7 @@ describe('PagoForm: abono valido', () => {
     await usuario.click(boton());
 
     await waitFor(() => expect(exito).toHaveBeenCalledTimes(1));
-    expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/pagos', {
+    expect(axios.post).toHaveBeenCalledWith('/api/pagos', {
       monto: 75.5,
       metodoPago: 'Pago en Ventanilla',
       deuda: { idDeuda: 7 },

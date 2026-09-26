@@ -81,24 +81,24 @@ function App() {
     // Pagos y tickets son operacion de cobranza: pedirlos aqui devolvia 403
     // para el administrador y el supervisor.
     if (!esGestor) return;
-    axios.get('http://localhost:8080/api/pagos', params).then(res => setPagos(res.data)).catch(console.error);
-    axios.get('http://localhost:8080/api/tickets', params).then(res => setTickets(res.data)).catch(console.error);
-    axios.get('http://localhost:8080/api/gestiones', params).then(res => setGestiones(res.data)).catch(console.error);
-    axios.get('http://localhost:8080/api/asignaciones-cartera', paramsGestor).then(res => setAsignaciones(res.data)).catch(console.error);
+    axios.get('/api/pagos', params).then(res => setPagos(res.data)).catch(console.error);
+    axios.get('/api/tickets', params).then(res => setTickets(res.data)).catch(console.error);
+    axios.get('/api/gestiones', params).then(res => setGestiones(res.data)).catch(console.error);
+    axios.get('/api/asignaciones-cartera', paramsGestor).then(res => setAsignaciones(res.data)).catch(console.error);
   };
 
   useEffect(() => {
     if (empleadoAutenticado) {
       const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
-      axios.get('http://localhost:8080/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
+      axios.get('/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
+      axios.get('/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
       if (esGestor) {
-        axios.get('http://localhost:8080/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
-        axios.get('http://localhost:8080/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
-        axios.get('http://localhost:8080/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
-        axios.get('http://localhost:8080/api/tipos-promesa', params).then(res => setTiposPromesa(res.data)).catch(console.error);
-        axios.get('http://localhost:8080/api/tipos-ticket', params).then(res => setTiposTicket(res.data)).catch(console.error);
-        axios.get('http://localhost:8080/api/asignaciones-cartera', { params: { empleadoId: empleadoAutenticado.idEmpleado } }).then(res => setAsignaciones(res.data)).catch(console.error);
+        axios.get('/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
+        axios.get('/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
+        axios.get('/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
+        axios.get('/api/tipos-promesa', params).then(res => setTiposPromesa(res.data)).catch(console.error);
+        axios.get('/api/tipos-ticket', params).then(res => setTiposTicket(res.data)).catch(console.error);
+        axios.get('/api/asignaciones-cartera', { params: { empleadoId: empleadoAutenticado.idEmpleado } }).then(res => setAsignaciones(res.data)).catch(console.error);
       }
       recargarDatosDinamicos();
     }
@@ -114,7 +114,7 @@ function App() {
     e.preventDefault();
     setLoginError('');
     try {
-      const response = await axios.post('http://localhost:8080/api/empleados/login', {
+      const response = await axios.post('/api/empleados/login', {
         usuario: loginUsuario.trim(),
         password: loginPass
       });
@@ -146,7 +146,7 @@ function App() {
     }
 
     try {
-      const response = await axios.post('http://localhost:8080/api/empleados/activar', {
+      const response = await axios.post('/api/empleados/activar', {
         numeroEmpleado: codigoEmpresa.toUpperCase(),
         nuevoUsuario: nuevoUsuario.trim(),
         nuevaContrasena: nuevaContrasena

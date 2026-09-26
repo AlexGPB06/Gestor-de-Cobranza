@@ -19,9 +19,9 @@ export default function AsignacionCartera({ empresaId }) {
   async function cargarDatos() {
     try {
       const params = empresaId ? { params: { empresaId } } : {};
-      const resEmpleados = await axios.get('http://localhost:8080/api/empleados', params);
-      const resDeudas = await axios.get('http://localhost:8080/api/deudas', params);
-      const resAsignaciones = await axios.get('http://localhost:8080/api/asignaciones-cartera', params);
+      const resEmpleados = await axios.get('/api/empleados', params);
+      const resDeudas = await axios.get('/api/deudas', params);
+      const resAsignaciones = await axios.get('/api/asignaciones-cartera', params);
 
       const gestores = resEmpleados.data.filter(emp => emp.activo === true);
 
@@ -84,7 +84,7 @@ export default function AsignacionCartera({ empresaId }) {
 
     try {
       const promesas = deudasSeleccionadas.map(idDeuda =>
-        axios.post('http://localhost:8080/api/asignaciones-cartera', {
+        axios.post('/api/asignaciones-cartera', {
           empleado: { idEmpleado: gestorSeleccionado },
           deuda: { idDeuda: idDeuda },
           fechaAsignacion: new Date().toISOString().split('T')[0],

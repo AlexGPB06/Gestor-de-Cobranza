@@ -43,8 +43,8 @@ export default function PromesasSupervisor({ supervisorId, empresaId }) {
   useEffect(() => {
     let activo = true;
     Promise.all([
-      axios.get('http://localhost:8080/api/supervision/promesas', { params: { supervisorId } }),
-      axios.get('http://localhost:8080/api/tipos-promesa', { params: { empresaId } })
+      axios.get('/api/supervision/promesas', { params: { supervisorId } }),
+      axios.get('/api/tipos-promesa', { params: { empresaId } })
     ])
       .then(([a, b]) => {
         if (activo) {
@@ -104,7 +104,7 @@ export default function PromesasSupervisor({ supervisorId, empresaId }) {
       if (form.tipoPromesaId) body.tipoPromesaId = Number(form.tipoPromesaId);
       if (form.montoPromesa !== '' && form.montoPromesa != null) body.montoPromesa = Number(form.montoPromesa);
       if (form.fechaPromesa) body.fechaPromesa = form.fechaPromesa;
-      await axios.put(`http://localhost:8080/api/gestiones/${editando.idGestion}/promesa`, body);
+      await axios.put(`/api/gestiones/${editando.idGestion}/promesa`, body);
       setMensaje(`✅ Promesa de ${editando.deuda?.numeroCuenta} modificada.`);
       setEditando(null);
       setRefresco(r => r + 1);
@@ -119,7 +119,7 @@ export default function PromesasSupervisor({ supervisorId, empresaId }) {
   const cambiarEstado = async (gestion, estado) => {
     setMensaje('');
     try {
-      await axios.put(`http://localhost:8080/api/gestiones/${gestion.idGestion}/estado-bonificacion`, { estado });
+      await axios.put(`/api/gestiones/${gestion.idGestion}/estado-bonificacion`, { estado });
       setMensaje(estado === 'APROBADA'
         ? `✅ Promesa de ${gestion.deuda?.numeroCuenta} aprobada.`
         : `🗑️ Promesa de ${gestion.deuda?.numeroCuenta} dada de baja.`);

@@ -38,7 +38,7 @@ describe('CatalogosManager: lectura', () => {
     render(<CatalogosManager />);
 
     expect(await screen.findByText('Falta de fondos')).toBeInTheDocument();
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/motivos-no-pago');
+    expect(axios.get).toHaveBeenCalledWith('/api/motivos-no-pago');
   });
 
   it('cambia de catalogo y recarga usando el endpoint correcto', async () => {
@@ -49,7 +49,7 @@ describe('CatalogosManager: lectura', () => {
     await usuario.click(screen.getByRole('button', { name: 'Tipos de Producto' }));
 
     expect(await screen.findByText('Tarjeta de credito')).toBeInTheDocument();
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/tipos-producto');
+    expect(axios.get).toHaveBeenCalledWith('/api/tipos-producto');
   });
 
   it('cambia la columna y el campo del formulario segun el catalogo', async () => {
@@ -108,7 +108,7 @@ describe('CatalogosManager: alta', () => {
     await usuario.click(guardar());
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/motivos-no-pago', {
+      expect(axios.post).toHaveBeenCalledWith('/api/motivos-no-pago', {
         descripcion: 'Sin respuesta',
       }),
     );
@@ -165,7 +165,7 @@ describe('CatalogosManager: edicion', () => {
     await usuario.click(screen.getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() =>
-      expect(axios.put).toHaveBeenCalledWith('http://localhost:8080/api/motivos-no-pago/1', {
+      expect(axios.put).toHaveBeenCalledWith('/api/motivos-no-pago/1', {
         descripcion: 'Sin fondos',
       }),
     );
@@ -225,7 +225,7 @@ describe('CatalogosManager: borrado', () => {
 
     expect(window.confirm).toHaveBeenCalledWith('¿Estás seguro de eliminar este registro?');
     await waitFor(() =>
-      expect(axios.delete).toHaveBeenCalledWith('http://localhost:8080/api/motivos-no-pago/1'),
+      expect(axios.delete).toHaveBeenCalledWith('/api/motivos-no-pago/1'),
     );
     expect(await screen.findByText('Registro eliminado correctamente.')).toBeInTheDocument();
   });

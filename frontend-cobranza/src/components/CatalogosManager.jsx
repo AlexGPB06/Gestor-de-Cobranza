@@ -27,7 +27,7 @@ export default function CatalogosManager() {
    */
   async function cargarDatosCatalogo() {
     try {
-      const response = await axios.get(`http://localhost:8080/api/${catalogoActual.endpoint}`);
+      const response = await axios.get(`/api/${catalogoActual.endpoint}`);
       setDatos(response.data);
     } catch (error) {
       console.error("Error al cargar catalogo:", error);
@@ -58,7 +58,7 @@ export default function CatalogosManager() {
 
     try {
       const payload = { [catalogoActual.campoTexto]: nuevoValor };
-      await axios.post(`http://localhost:8080/api/${catalogoActual.endpoint}`, payload);
+      await axios.post(`/api/${catalogoActual.endpoint}`, payload);
       
       setNuevoValor('');
       setNotificacion({ tipo: 'exito', mensaje: 'Registro creado exitosamente.' });
@@ -74,7 +74,7 @@ export default function CatalogosManager() {
     if (!window.confirm('¿Estás seguro de eliminar este registro?')) return;
     
     try {
-      await axios.delete(`http://localhost:8080/api/${catalogoActual.endpoint}/${id}`);
+      await axios.delete(`/api/${catalogoActual.endpoint}/${id}`);
       setNotificacion({ tipo: 'exito', mensaje: 'Registro eliminado correctamente.' });
       cargarDatosCatalogo();
     } catch (error) {
@@ -94,7 +94,7 @@ export default function CatalogosManager() {
 
     try {
       const payload = { [catalogoActual.campoTexto]: valorEdicion };
-      await axios.put(`http://localhost:8080/api/${catalogoActual.endpoint}/${id}`, payload);
+      await axios.put(`/api/${catalogoActual.endpoint}/${id}`, payload);
       
       setEditandoId(null);
       setNotificacion({ tipo: 'exito', mensaje: 'Registro actualizado exitosamente.' });

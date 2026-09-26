@@ -57,7 +57,7 @@ export default function BonificacionesTab({ deudor, deudas, gestiones, onDatosAc
 
   const cambiarEstado = (idGestion, estado) => {
     setGuardandoId(idGestion);
-    axios.put(`http://localhost:8080/api/gestiones/${idGestion}/estado-bonificacion`, { estado })
+    axios.put(`/api/gestiones/${idGestion}/estado-bonificacion`, { estado })
       .then(() => {
         if (onDatosActualizados) onDatosActualizados();
       })

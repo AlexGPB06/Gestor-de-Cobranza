@@ -29,7 +29,7 @@ export default function EmpleadosManager({ empresaId }) {
   }, [empresaId]);
 
   useEffect(() => {
-    axios.get('http://localhost:8080/api/empresas')
+    axios.get('/api/empresas')
       .then(res => {
         setEmpresas(res.data);
         if (empresaId) setEmpresaSel(String(empresaId));
@@ -40,7 +40,7 @@ export default function EmpleadosManager({ empresaId }) {
   async function cargarDatos() {
     try {
       const params = empresaId ? { params: { empresaId } } : {};
-      const resEmpleados = await axios.get('http://localhost:8080/api/empleados', params);
+      const resEmpleados = await axios.get('/api/empleados', params);
       setEmpleados(resEmpleados.data);
     } catch (error) {
       console.error("Error al cargar empleados:", error);
@@ -86,7 +86,7 @@ export default function EmpleadosManager({ empresaId }) {
         idSupervisor: supervisorSel || undefined
       };
 
-      const respuesta = await axios.post('http://localhost:8080/api/empleados', nuevoEmpleado);
+      const respuesta = await axios.post('/api/empleados', nuevoEmpleado);
       const numero = respuesta.data?.numeroEmpleado || nuevoEmpleado.numeroEmpleado;
 
       setNotificacion({
@@ -115,7 +115,7 @@ export default function EmpleadosManager({ empresaId }) {
 
     setNotificacion({ tipo: '', mensaje: '' });
     try {
-      const respuesta = await axios.post('http://localhost:8080/api/empleados/estado', {
+      const respuesta = await axios.post('/api/empleados/estado', {
         numeroEmpleado: empleado.numeroEmpleado,
         activo: String(activar)
       });
@@ -135,7 +135,7 @@ export default function EmpleadosManager({ empresaId }) {
 
     setNotificacion({ tipo: '', mensaje: '' });
     try {
-      const respuesta = await axios.delete(`http://localhost:8080/api/empleados/${empleado.numeroEmpleado}`);
+      const respuesta = await axios.delete(`/api/empleados/${empleado.numeroEmpleado}`);
       setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Alta eliminada' });
       await cargarDatos();
     } catch (error) {

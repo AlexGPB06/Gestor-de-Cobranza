@@ -343,7 +343,7 @@ describe('App: activacion de cuenta', () => {
     await usuario.click(screen.getByRole('button', { name: 'Activar mi Cuenta' }));
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/empleados/activar', {
+      expect(axios.post).toHaveBeenCalledWith('/api/empleados/activar', {
         numeroEmpleado: 'A1B2C',
         nuevoUsuario: 'nuevo',
         nuevaContrasena: 'Secreto123',

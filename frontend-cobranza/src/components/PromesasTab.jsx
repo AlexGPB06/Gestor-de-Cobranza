@@ -33,7 +33,7 @@ export default function PromesasTab({ deudor, deudas, gestiones, onDatosActualiz
     .sort((a, b) => new Date(b.fechaRegistro) - new Date(a.fechaRegistro));
 
   const guardarMonto = (idGestion) => {
-    axios.put(`http://localhost:8080/api/gestiones/${idGestion}/monto-pagado`, { montoPagado: parseFloat(montoEdicion) || 0 })
+    axios.put(`/api/gestiones/${idGestion}/monto-pagado`, { montoPagado: parseFloat(montoEdicion) || 0 })
       .then(() => {
         setEditandoId(null);
         setMontoEdicion('');

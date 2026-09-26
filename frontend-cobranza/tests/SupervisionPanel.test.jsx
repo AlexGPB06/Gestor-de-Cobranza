@@ -69,7 +69,7 @@ describe('SupervisionPanel: consulta', () => {
     render(<SupervisionPanel supervisorId={7} />);
 
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/equipo', {
+      expect(axios.get).toHaveBeenCalledWith('/api/supervision/equipo', {
         params: { supervisorId: 7, periodo: 'MES' },
       }),
     );
@@ -83,7 +83,7 @@ describe('SupervisionPanel: consulta', () => {
     await usuario.click(screen.getByRole('button', { name: 'Hoy' }));
 
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/equipo', {
+      expect(axios.get).toHaveBeenCalledWith('/api/supervision/equipo', {
         params: { supervisorId: 7, periodo: 'HOY' },
       }),
     );
@@ -169,7 +169,7 @@ describe('SupervisionPanel: detalhe de gestiones', () => {
     await usuario.click(within(filaDe('Verónica Castillo')).getByRole('button', { name: /ver gestiones/i }));
 
     expect(await screen.findByText('Gestiones de Verónica Castillo')).toBeInTheDocument();
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/gestiones', {
+    expect(axios.get).toHaveBeenCalledWith('/api/gestiones', {
       params: { empleadoId: 10 },
     });
   });

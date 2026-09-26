@@ -37,7 +37,7 @@ export default function SupervisionPanel({ supervisorId }) {
 
   useEffect(() => {
     let activo = true;
-    axios.get('http://localhost:8080/api/supervision/equipo', { params: { supervisorId, periodo } })
+    axios.get('/api/supervision/equipo', { params: { supervisorId, periodo } })
       .then(res => { if (activo) setEquipo(res.data); })
       .catch(() => { if (activo) setError('No se pudo consultar el equipo. Verifica la conexión con el servidor.'); })
       .finally(() => { if (activo) setCargando(false); });
@@ -47,7 +47,7 @@ export default function SupervisionPanel({ supervisorId }) {
   const PERIODO_LABEL = { HOY: 'Hoy', MES: 'Mes', TODO: 'Total' };
 
   const abrirGestionesDe = async (empleado) => {
-    const res = await axios.get('http://localhost:8080/api/gestiones', { params: { empleadoId: empleado.idEmpleado } });
+    const res = await axios.get('/api/gestiones', { params: { empleadoId: empleado.idEmpleado } });
     setGestionesEmpleado({ empleado, gestiones: res.data });
   };
 

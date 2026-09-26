@@ -86,7 +86,7 @@ describe('EmpleadosManager: carga del directorio', () => {
     render(<EmpleadosManager empresaId={2} />);
 
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/empleados', {
+      expect(axios.get).toHaveBeenCalledWith('/api/empleados', {
         params: { empresaId: 2 },
       }),
     );
@@ -210,7 +210,7 @@ describe('EmpleadosManager: alta de personal', () => {
     await usuario.click(screen.getByRole('button', { name: /registrar/i }));
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/empleados', {
+      expect(axios.post).toHaveBeenCalledWith('/api/empleados', {
         nombreCompleto: 'Nueva Persona',
         correoElectronico: 'nueva@acme.com',
         numeroEmpleado: 'AB123',
@@ -272,7 +272,7 @@ describe('EmpleadosManager: baja, reactivacion y borrado', () => {
     await usuario.click(boton);
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/empleados/estado', {
+      expect(axios.post).toHaveBeenCalledWith('/api/empleados/estado', {
         numeroEmpleado: 'S1G01',
         activo: 'false',
       }),
@@ -300,7 +300,7 @@ describe('EmpleadosManager: baja, reactivacion y borrado', () => {
     await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /reactivar/i }));
 
     await waitFor(() =>
-      expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/empleados/estado', {
+      expect(axios.post).toHaveBeenCalledWith('/api/empleados/estado', {
         numeroEmpleado: 'S8OFF',
         activo: 'true',
       }),
@@ -326,7 +326,7 @@ describe('EmpleadosManager: baja, reactivacion y borrado', () => {
     await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /eliminar/i }));
 
     await waitFor(() =>
-      expect(axios.delete).toHaveBeenCalledWith('http://localhost:8080/api/empleados/S9NEW'),
+      expect(axios.delete).toHaveBeenCalledWith('/api/empleados/S9NEW'),
     );
     expect(await screen.findByText('Alta eliminada')).toBeInTheDocument();
   });

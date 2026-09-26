@@ -243,7 +243,7 @@ describe('TicketsTab: envio', () => {
     await usuario.click(enviar());
 
     await waitFor(() => expect(axios.post).toHaveBeenCalled());
-    expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/tickets', {
+    expect(axios.post).toHaveBeenCalledWith('/api/tickets', {
       numero: '118',
       asunto: 'Aprobación de Promoción',
       idDeuda: 55,

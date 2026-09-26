@@ -25,7 +25,7 @@ export default function PagoForm({ deudaId, saldoRestante, onPagoExitoso }) {
       deuda: { idDeuda: deudaId }
     };
 
-    axios.post('http://localhost:8080/api/pagos', nuevoPago)
+    axios.post('/api/pagos', nuevoPago)
       .then(() => {
         alert('Pago aplicado exitosamente. El saldo de la deuda se ha actualizado.');
         setMontoPago('');

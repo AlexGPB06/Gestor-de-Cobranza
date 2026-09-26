@@ -138,7 +138,7 @@ describe('GestionForm: gestion sin promesa', () => {
     await usuario.click(boton());
 
     await waitFor(() => expect(axios.post).toHaveBeenCalled());
-    expect(axios.post).toHaveBeenCalledWith('http://localhost:8080/api/gestiones', {
+    expect(axios.post).toHaveBeenCalledWith('/api/gestiones', {
       deuda: { idDeuda: 55 },
       empleado: { idEmpleado: 3 },
       concepto: { idConcepto: 1 },

@@ -36,9 +36,9 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
 
   const obtenerDatos = async () => {
     const [resEmp, resDeu, resAsig] = await Promise.all([
-      axios.get('http://localhost:8080/api/empleados', { params: { empresaId } }),
-      axios.get('http://localhost:8080/api/deudas', { params: { empresaId } }),
-      axios.get('http://localhost:8080/api/asignaciones-cartera', { params: { empresaId } })
+      axios.get('/api/empleados', { params: { empresaId } }),
+      axios.get('/api/deudas', { params: { empresaId } }),
+      axios.get('/api/asignaciones-cartera', { params: { empresaId } })
     ]);
     const misGestores = resEmp.data.filter(
       (e) => e.rol?.toUpperCase() === 'GESTOR' && Number(e.supervisor?.idEmpleado) === Number(supervisorId)
@@ -115,7 +115,7 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
     setAsignando(true);
     setMensaje('');
     try {
-      const res = await axios.post('http://localhost:8080/api/asignaciones-cartera/por-lote', {
+      const res = await axios.post('/api/asignaciones-cartera/por-lote', {
         empleadoId: gestorSel.idEmpleado,
         deudaIds: [...seleccionadas]
       });

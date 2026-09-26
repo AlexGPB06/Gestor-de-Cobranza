@@ -10,7 +10,7 @@ export default function AuditoriaViewer() {
     setCargando(true);
     setError('');
     try {
-      const response = await axios.get('http://localhost:8080/api/logs-auditoria');
+      const response = await axios.get('/api/logs-auditoria');
       // Ordenamos los registros para que los más recientes aparezcan arriba
       const logsOrdenados = response.data.sort((a, b) => new Date(b.fecha) - new Date(a.fecha));
       setLogs(logsOrdenados);

@@ -61,6 +61,7 @@ public class DataSeeder implements CommandLineRunner {
     @Override
     @Transactional
     public void run(String... args) {
+        semillasEmpresas();
         semillasTiposPromesa();
         semillasDepartamentos();
         asignarCobranzaAEmpleados();
@@ -70,6 +71,25 @@ public class DataSeeder implements CommandLineRunner {
         desactivarConceptosPromocionesConvenio();
         semillasCarterasSupervisadas();
         semillasRoles();
+    }
+
+    private void semillasEmpresas() {
+        String[][] base = {
+                {"Santander", "SAN010101XX1", "BANCO"},
+                {"Crediplus", "CRE010101XX2", "FINANCIERA"},
+                {"Proteccion MX", "PRO010101XX3", "ASEGURADORA"}
+        };
+        for (String[] e : base) {
+            if (empresaRepository.existsByNombre(e[0])) {
+                continue;
+            }
+            Empresa empresa = new Empresa();
+            empresa.setNombre(e[0]);
+            empresa.setRfc(e[1]);
+            empresa.setTipo(e[2]);
+            empresa.setActivo(true);
+            empresaRepository.save(empresa);
+        }
     }
 
     private void semillasTiposPromesa() {

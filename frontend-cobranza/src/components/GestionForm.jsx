@@ -91,7 +91,7 @@ export default function GestionForm({ deuda, deudor, conceptos, motivos, onGesti
       }
     }
 
-    axios.post('http://localhost:8080/api/gestiones', nuevaGestion)
+    axios.post('/api/gestiones', nuevaGestion)
       .then(() => {
         setConceptoId('');
         setMotivoId('');

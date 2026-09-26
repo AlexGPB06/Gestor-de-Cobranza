@@ -73,13 +73,13 @@ describe('MiMetaEquipo: carga', () => {
     expect(screen.getByText('Calculando la meta del equipo...')).toBeInTheDocument();
     await waitFor(() => expect(screen.getByRole('heading', { name: /Meta del Equipo/ })).toBeInTheDocument());
 
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/equipo', {
+    expect(axios.get).toHaveBeenCalledWith('/api/supervision/equipo', {
       params: { supervisorId: 9 },
     });
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/equipo', {
+    expect(axios.get).toHaveBeenCalledWith('/api/supervision/equipo', {
       params: { supervisorId: 9, periodo: 'MES' },
     });
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/supervision/promesas', {
+    expect(axios.get).toHaveBeenCalledWith('/api/supervision/promesas', {
       params: { supervisorId: 9 },
     });
   });

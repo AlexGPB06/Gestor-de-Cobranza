@@ -189,7 +189,7 @@ describe('BonificacionesTab: cambio de estado', () => {
 
     await waitFor(() => expect(actualizados).toHaveBeenCalledTimes(1));
     expect(axios.put).toHaveBeenCalledWith(
-      'http://localhost:8080/api/gestiones/20/estado-bonificacion',
+      '/api/gestiones/20/estado-bonificacion',
       { estado: 'APROBADA' },
     );
   });

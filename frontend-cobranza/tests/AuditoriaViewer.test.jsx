@@ -28,7 +28,7 @@ describe('AuditoriaViewer: carga', () => {
     expect(screen.getByText('Cargando registros de seguridad...')).toBeInTheDocument();
 
     await waitFor(() => expect(screen.getByText('Alta de empleado S1G09')).toBeInTheDocument());
-    expect(axios.get).toHaveBeenCalledWith('http://localhost:8080/api/logs-auditoria');
+    expect(axios.get).toHaveBeenCalledWith('/api/logs-auditoria');
   });
 
   it('ordena los registros del mas reciente al mas antiguo', async () => {

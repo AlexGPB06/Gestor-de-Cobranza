@@ -41,9 +41,9 @@ export default function MiMetaEquipo({ supervisorId }) {
   useEffect(() => {
     let activo = true;
     Promise.all([
-      axios.get('http://localhost:8080/api/supervision/equipo', { params: { supervisorId } }),
-      axios.get('http://localhost:8080/api/supervision/equipo', { params: { supervisorId, periodo: 'MES' } }),
-      axios.get('http://localhost:8080/api/supervision/promesas', { params: { supervisorId } })
+      axios.get('/api/supervision/equipo', { params: { supervisorId } }),
+      axios.get('/api/supervision/equipo', { params: { supervisorId, periodo: 'MES' } }),
+      axios.get('/api/supervision/promesas', { params: { supervisorId } })
     ])
       .then(([a, b, c]) => {
         if (activo) {
