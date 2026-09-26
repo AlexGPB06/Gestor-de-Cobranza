@@ -372,8 +372,8 @@ jobs:
         uses: zaproxy/action-baseline@v0.10.0
         with:
           target: http://localhost:5173
-          spider: 5
           fail_action: false
+          allow_issue_writing: false
 
       - name: Publicar reporte de ZAP
         if: always()
