@@ -43,6 +43,15 @@ const COMPONENTES_CON_LOGICA = [
   './src/components/GestionForm.jsx',
   './src/components/AuditoriaViewer.jsx',
   './src/components/InfoGestion.jsx',
+  './src/components/PromesasTab.jsx',
+  './src/components/BonificacionesTab.jsx',
+  './src/components/TicketsTab.jsx',
+  './src/components/CXC_Pagos.jsx',
+  './src/components/GestionPanel.jsx',
+  './src/components/MiMeta.jsx',
+  './src/components/MiMetaEquipo.jsx',
+  './src/components/PromesasSupervisor.jsx',
+  './src/components/AsignacionSupervisor.jsx',
 ];
 
 const umbralDe = (rutas) =>
@@ -72,6 +81,7 @@ export default {
   coverageDirectory: 'coverage',
   coverageReporters: ['text-summary', 'lcov', 'json-summary'],
   coverageThreshold: {
+    global: { statements: 80, branches: 80, functions: 80, lines: 80 },
     ...umbralDe(NUCLEO_SEGURIDAD),
     ...umbralDe(COMPONENTES_CON_LOGICA),
   },

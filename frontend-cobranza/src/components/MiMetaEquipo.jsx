@@ -50,6 +50,7 @@ export default function MiMetaEquipo({ supervisorId }) {
           setEquipoTodo(a.data);
           setEquipoMes(b.data);
           setPromesas(c.data);
+          setError('');
         }
       })
       .catch(() => { if (activo) setError('No se pudo consultar la meta del equipo.'); })
