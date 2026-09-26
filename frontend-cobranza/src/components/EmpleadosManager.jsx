@@ -305,7 +305,6 @@ export default function EmpleadosManager({ empresaId }) {
                 ) : (
                   empleadosFiltrados.map((emp) => {
                     const sinUsuario = !emp.usuario;
-                    const dadoDeBaja = !emp.activo && !sinUsuario;
                     return (
                       <tr key={emp.idEmpleado || emp.id} className="hover:bg-slate-50">
                         <td className="px-6 py-4 whitespace-nowrap">

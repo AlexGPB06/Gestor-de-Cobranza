@@ -12,6 +12,10 @@ dist
 dist-ssr
 *.local
 
+# Informes de cobertura: son artefactos generados, se reconstruyen con
+# `npm run test:coverage`. Versionarlos ensucia cada commit de tests.
+coverage
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

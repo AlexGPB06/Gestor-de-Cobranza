@@ -22,7 +22,10 @@ export default function AuditoriaViewer() {
     }
   };
 
+  // Carga inicial de la bitacora: sincronizacion con el servidor, con el setState
+  // dentro del async tras la respuesta.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     cargarLogs();
   }, []);
 

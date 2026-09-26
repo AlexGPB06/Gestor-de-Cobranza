@@ -12,17 +12,35 @@ import EmpleadosManager from './components/EmpleadosManager';
 import SupervisionPanel from './components/SupervisionPanel';
 import AsignacionSupervisor from './components/AsignacionSupervisor';
 import PromesasSupervisor from './components/PromesasSupervisor';
-import { esOperador, resolverVista, seccionesPermitidas } from './permisos';
+import { esOperador, esAdministrador, esSupervisor, resolverVista, seccionesPermitidas } from './permisos';
 
 function App() {
   // --- ESTADO DE AUTENTICACIÓN ---
-  const [empleadoAutenticado, setEmpleadoAutenticado] = useState(null);
+  // La sesion guardada se lee de forma perezosa, en el primer render, en vez de
+  // hidratar el estado con un efecto: asi no hay un render con la pantalla en
+  // blanco antes de recuperar al empleado.
+  const [empleadoAutenticado, setEmpleadoAutenticado] = useState(() => {
+    const guardada = localStorage.getItem('empleado');
+    if (!guardada) return null;
+    try {
+      return JSON.parse(guardada);
+    } catch {
+      localStorage.removeItem('empleado');
+      return null;
+    }
+  });
   
   // --- ESTADOS DE LOGIN Y ACTIVACIÓN ---
   const [modoLogin, setModoLogin] = useState('ingresar'); // 'ingresar' o 'activar'
   const [loginUsuario, setLoginUsuario] = useState('');
   const [loginPass, setLoginPass] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [loginError, setLoginError] = useState(() => {
+    // El aviso de sesion expirada lo deja apiClient al recibir un 401; se consume
+    // aqui de forma perezosa para no depender de un efecto que dispare un render extra.
+    if (!sessionStorage.getItem('sesionExpirada')) return '';
+    sessionStorage.removeItem('sesionExpirada');
+    return 'Tu sesión expiró. Vuelve a iniciar sesión.';
+  });
   
   const [codigoEmpresa, setCodigoEmpresa] = useState('');
   const [nuevoUsuario, setNuevoUsuario] = useState('');
@@ -42,32 +60,17 @@ function App() {
   const [tickets, setTickets] = useState([]);
 
   // --- ESTADOS DE UI ---
-  const [vistaActual, setVistaActual] = useState('info');
+  // vistaSolicitada es lo que el usuario pide al pulsar el menu; vistaActual es la
+  // que de verdad se muestra, ya recortada a las vistas que su rol permite. Se
+  // deriva en el render en lugar de sincronizarla con un efecto.
+  const [vistaSolicitada, setVistaSolicitada] = useState('info');
+  const vistaActual = resolverVista(empleadoAutenticado?.rol, vistaSolicitada);
+  const setVistaActual = setVistaSolicitada;
   const [tabInfo, setTabInfo] = useState('info'); // submenú dentro de Info/Gestión: info | gestion | pagos
   const [terminoBusqueda, setTerminoBusqueda] = useState('');
   const [deudorBuscado, setDeudorBuscado] = useState(null);
   const [deudaSeleccionadaId, setDeudaSeleccionadaId] = useState(null);
   const [mensajeBusqueda, setMensajeBusqueda] = useState('');
-
-  useEffect(() => {
-    const guardada = localStorage.getItem('empleado');
-    if (guardada && !empleadoAutenticado) {
-      try {
-        setEmpleadoAutenticado(JSON.parse(guardada));
-      } catch {
-        localStorage.removeItem('empleado');
-      }
-    }
-    if (sessionStorage.getItem('sesionExpirada')) {
-      sessionStorage.removeItem('sesionExpirada');
-      setLoginError('Tu sesión expiró. Vuelve a iniciar sesión.');
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!empleadoAutenticado) return;
-    setVistaActual((actual) => resolverVista(empleadoAutenticado.rol, actual));
-  }, [empleadoAutenticado]);
 
   const esGestor = esOperador(empleadoAutenticado?.rol);
 
@@ -344,7 +347,7 @@ function App() {
 
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto">
-          {vistaActual === 'info' && empleadoAutenticado.rol === 'GESTOR' && (
+          {vistaActual === 'info' && esGestor && (
             <InfoGestion
               terminoBusqueda={terminoBusqueda}
               onTerminoChange={setTerminoBusqueda}
@@ -369,27 +372,27 @@ function App() {
               onDatosActualizados={recargarDatosDinamicos}
             />
           )}
-          {vistaActual === 'cartera' && empleadoAutenticado.rol === 'GESTOR' && (
+          {vistaActual === 'cartera' && esGestor && (
             <CarteraGestor
               asignaciones={asignaciones}
               onSeleccionar={seleccionarParaGestion}
             />
           )}
-          {vistaActual === 'meta' && empleadoAutenticado.rol === 'GESTOR' && (
+          {vistaActual === 'meta' && esGestor && (
             <MiMeta
               empleadoActual={empleadoAutenticado}
               gestiones={gestiones}
             />
           )}
-          {vistaActual === 'metaEquipo' && empleadoAutenticado.rol === 'SUPERVISOR' && <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />}
-          {vistaActual === 'campanas' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
-          {vistaActual === 'empleados' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><EmpleadosManager empresaId={empleadoAutenticado.idEmpresa} /></div>}
-          {vistaActual === 'asignacion' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><AsignacionCartera empresaId={empleadoAutenticado.idEmpresa} /></div>}
-          {vistaActual === 'catalogos' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><CatalogosManager /></div>}
-          {vistaActual === 'auditoria' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><AuditoriaViewer /></div>}
-          {vistaActual === 'supervision' && empleadoAutenticado.rol === 'SUPERVISOR' && <SupervisionPanel supervisorId={empleadoAutenticado.idEmpleado} />}
-          {vistaActual === 'asignacionSup' && empleadoAutenticado.rol === 'SUPERVISOR' && <AsignacionSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
-          {vistaActual === 'promesasSup' && empleadoAutenticado.rol === 'SUPERVISOR' && <PromesasSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
+          {vistaActual === 'metaEquipo' && esSupervisor(empleadoAutenticado.rol) && <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />}
+          {vistaActual === 'campanas' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
+          {vistaActual === 'empleados' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><EmpleadosManager empresaId={empleadoAutenticado.idEmpresa} /></div>}
+          {vistaActual === 'asignacion' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><AsignacionCartera empresaId={empleadoAutenticado.idEmpresa} /></div>}
+          {vistaActual === 'catalogos' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><CatalogosManager /></div>}
+          {vistaActual === 'auditoria' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><AuditoriaViewer /></div>}
+          {vistaActual === 'supervision' && esSupervisor(empleadoAutenticado.rol) && <SupervisionPanel supervisorId={empleadoAutenticado.idEmpleado} />}
+          {vistaActual === 'asignacionSup' && esSupervisor(empleadoAutenticado.rol) && <AsignacionSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
+          {vistaActual === 'promesasSup' && esSupervisor(empleadoAutenticado.rol) && <PromesasSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
         </div>
       </main>
     </div>

@@ -178,8 +178,6 @@ describe('EmpleadosManager: buscador', () => {
 });
 
 describe('EmpleadosManager: alta de personal', () => {
-  const campo = (etiqueta) => screen.getByLabelText(new RegExp(etiqueta, 'i'));
-
   const rellenarFormulario = async (usuario, { numero = 'AB123', rol = 'GESTOR' } = {}) => {
     await usuario.type(screen.getByPlaceholderText('Ej. Juan Pérez'), 'Nueva Persona');
     await usuario.type(screen.getByPlaceholderText('juan@bpo.com'), 'nueva@acme.com');
@@ -310,7 +308,6 @@ describe('EmpleadosManager: baja, reactivacion y borrado', () => {
   });
 
   it('ofrece eliminar y no reactivar en un alta que nunca se activo', async () => {
-    const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
     const fila = await screen.findByText('Alta Pendiente');

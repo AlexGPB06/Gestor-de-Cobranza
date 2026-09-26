@@ -20,22 +20,37 @@ export default function CatalogosManager() {
 
   const catalogoActual = catalogosConfig.find(c => c.id === tabActiva);
 
-  useEffect(() => {
-    cargarDatosCatalogo();
-    setNotificacion({ tipo: '', mensaje: '' });
-    setNuevoValor('');
-    setEditandoId(null);
-  }, [tabActiva]);
-
-  const cargarDatosCatalogo = async () => {
+  /**
+   * Declarada como funcion (y no como const) porque el efecto de abajo la invoca
+   * en la misma pasada de render; con const se produciria un error de zona
+   * temporal muerta.
+   */
+  async function cargarDatosCatalogo() {
     try {
       const response = await axios.get(`http://localhost:8080/api/${catalogoActual.endpoint}`);
       setDatos(response.data);
     } catch (error) {
-      console.error("Error al cargar catálogo:", error);
+      console.error("Error al cargar catalogo:", error);
       setNotificacion({ tipo: 'error', mensaje: 'Error al obtener los datos del servidor.' });
     }
+  }
+
+  // El reinicio del formulario tiene sentido al cambiar de pestana, no al montar,
+  // por eso vive en el manejador del clic y no dentro del efecto.
+  const cambiarTab = (id) => {
+    setTabActiva(id);
+    setNotificacion({ tipo: '', mensaje: '' });
+    setNuevoValor('');
+    setEditandoId(null);
   };
+
+  // Descarga del catalogo activo: es una sincronizacion con el servidor, no un
+  // estado derivado. El setState ocurre dentro del async, tras la respuesta.
+  /* eslint-disable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
+  useEffect(() => {
+    cargarDatosCatalogo();
+  }, [tabActiva]);
+  /* eslint-enable react-hooks/set-state-in-effect, react-hooks/exhaustive-deps */
 
   const handleCrearRegistro = async (e) => {
     e.preventDefault();
@@ -98,7 +113,7 @@ export default function CatalogosManager() {
         {catalogosConfig.map((cat) => (
           <button
             key={cat.id}
-            onClick={() => setTabActiva(cat.id)}
+            onClick={() => cambiarTab(cat.id)}
             className={`px-4 py-2 font-semibold text-sm transition-colors border-b-2 ${
               tabActiva === cat.id 
                 ? 'border-blue-600 text-blue-600' 

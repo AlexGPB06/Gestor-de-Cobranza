@@ -2,35 +2,47 @@
  * Configuracion de Jest para el frontend.
  *
  * Alcance del umbral: se exige 80% sobre el nucleo de seguridad y de logica
- * (permisos, cliente HTTP) y sobre los componentes vivos con filtrado, busqueda
- * o envio. Los componentes de presentacion grandes se miden y se reportan, pero
- * no bloquean el pipeline hasta que existan pruebas para ellos. El numero
- * global se imprime con `npm run test:coverage:global` para no maquillar la
- * deuda pendiente.
+ * (permisos, cliente HTTP, App) y sobre los componentes vivos con filtrado,
+ * busqueda, formato o envio. Los componentes de presentacion grandes se miden
+ * y se reportan, pero no bloquean el pipeline hasta que existan pruebas para
+ * ellos. El numero global se imprime con `npm run test:coverage:global` para
+ * no maquillar la deuda pendiente.
  *
- * Sidebar, ProtectedRoute y AuthContext quedan fuera: forman una isla muerta
- * que la app actual no monta (App.jsx lleva su propio estado y no hay router).
- * Exigir cobertura de codigo que nadie ejecuta no aporta nada.
+ * La isla muerta que quedo antes (Login, Sidebar, ProtectedRoute y AuthContext,
+ * sin router en la app) se elimino: main.jsx solo monta <App />, asi que nada
+ * ejecutaba ese codigo. Exigir cobertura de codigo que nadie corre no aporta.
  */
 
 const RUTAS_POR_DEFECTO = {
   clearMocks: true,
   restoreMocks: true,
+  // Bajo carga (CI oCoverage en paralelo) los timers de userEvent pueden
+  // pasarse del default de 5s y producir fallos intermitentes sin causa real.
+  testTimeout: 20000,
 };
 
 /** Nucleo con decisiones de seguridad: sin esto, un cambio rompe el silencio. */
 const NUCLEO_SEGURIDAD = [
   './src/permisos.js',
   './src/apiClient.js',
+  './src/App.jsx',
 ];
 
-/** Componentes vivos con logica de filtrado, busqueda o envio. */
+/** Componentes vivos con logica de filtrado, busqueda, formato o envio. */
 const COMPONENTES_CON_LOGICA = [
   './src/components/EmpleadosManager.jsx',
   './src/components/AsignacionCartera.jsx',
   './src/components/SupervisionPanel.jsx',
   './src/components/CatalogosManager.jsx',
   './src/components/CampanaList.jsx',
+  './src/components/ClienteInfo.jsx',
+  './src/components/CarteraGestor.jsx',
+  './src/components/DashboardKPI.jsx',
+  './src/components/DetalleVista.jsx',
+  './src/components/PagoForm.jsx',
+  './src/components/GestionForm.jsx',
+  './src/components/AuditoriaViewer.jsx',
+  './src/components/InfoGestion.jsx',
 ];
 
 const umbralDe = (rutas) =>
