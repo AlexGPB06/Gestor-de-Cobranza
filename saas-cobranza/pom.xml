@@ -28,6 +28,13 @@
 	</scm>
 	<properties>
 		<java.version>25</java.version>
+		<!--
+			Los mensajes de la API estan en espanol con acentos. Sin fijar UTF-8
+			Maven usa el charset de la plataforma y el mismo codigo se compila
+			distinto en Windows y en el runner de Ubuntu.
+		-->
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 	</properties>
 	<dependencies>
 		<dependency>
@@ -96,13 +103,70 @@
 	<build>
 		<plugins>
 			<plugin>
+				<groupId>org.jacoco</groupId>
+				<artifactId>jacoco-maven-plugin</artifactId>
+				<executions>
+					<execution>
+						<id>preparar-agente</id>
+						<goals>
+							<goal>prepare-agent</goal>
+						</goals>
+					</execution>
+					<execution>
+						<id>generar-reporte</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>report</goal>
+						</goals>
+						<configuration>
+							<formats>
+								<format>HTML</format>
+								<format>XML</format>
+							</formats>
+							<excludes>
+								<!--
+									El seeder es una herramienta de desarrollo: solo corre con la
+									propiedad saas.cobranza.semillas en true y nunca en produccion.
+									Se excluye de la medicion para que el 80% mida logica de negocio
+									y no datos de arranque.
+								-->
+								<exclude>com/cobranza/saas_cobranza/DataSeeder*</exclude>
+							</excludes>
+						</configuration>
+					</execution>
+					<execution>
+						<id>verificar-umbral</id>
+						<phase>verify</phase>
+						<goals>
+							<goal>check</goal>
+						</goals>
+						<configuration>
+							<excludes>
+								<exclude>com/cobranza/saas_cobranza/DataSeeder*</exclude>
+							</excludes>
+							<rules>
+								<rule>
+									<element>BUNDLE</element>
+									<limits>
+										<limit>
+											<counter>LINE</counter>
+											<value>COVEREDRATIO</value>
+											<minimum>0.80</minimum>
+										</limit>
+									</limits>
+								</rule>
+							</rules>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
+			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
 			</plugin>
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
-				<artifactId>maven-compiler-plugin</artifactId>
-				<executions>
+				<artifactId>maven-compiler-plugin</artifactId>				<executions>
 					<execution>
 						<id>default-compile</id>
 						<phase>compile</phase>

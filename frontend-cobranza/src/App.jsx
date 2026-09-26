@@ -12,6 +12,7 @@ import EmpleadosManager from './components/EmpleadosManager';
 import SupervisionPanel from './components/SupervisionPanel';
 import AsignacionSupervisor from './components/AsignacionSupervisor';
 import PromesasSupervisor from './components/PromesasSupervisor';
+import { esOperador, resolverVista, seccionesPermitidas } from './permisos';
 
 function App() {
   // --- ESTADO DE AUTENTICACIÓN ---
@@ -48,27 +49,54 @@ function App() {
   const [deudaSeleccionadaId, setDeudaSeleccionadaId] = useState(null);
   const [mensajeBusqueda, setMensajeBusqueda] = useState('');
 
+  useEffect(() => {
+    const guardada = localStorage.getItem('empleado');
+    if (guardada && !empleadoAutenticado) {
+      try {
+        setEmpleadoAutenticado(JSON.parse(guardada));
+      } catch {
+        localStorage.removeItem('empleado');
+      }
+    }
+    if (sessionStorage.getItem('sesionExpirada')) {
+      sessionStorage.removeItem('sesionExpirada');
+      setLoginError('Tu sesión expiró. Vuelve a iniciar sesión.');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!empleadoAutenticado) return;
+    setVistaActual((actual) => resolverVista(empleadoAutenticado.rol, actual));
+  }, [empleadoAutenticado]);
+
+  const esGestor = esOperador(empleadoAutenticado?.rol);
+
   const recargarDatosDinamicos = () => {
     if (!empleadoAutenticado) return;
     const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
     const paramsGestor = { params: { empleadoId: empleadoAutenticado.idEmpleado } };
-    axios.get('http://localhost:8080/api/gestiones', params).then(res => setGestiones(res.data)).catch(console.error);
+    // Pagos y tickets son operacion de cobranza: pedirlos aqui devolvia 403
+    // para el administrador y el supervisor.
+    if (!esGestor) return;
     axios.get('http://localhost:8080/api/pagos', params).then(res => setPagos(res.data)).catch(console.error);
-    axios.get('http://localhost:8080/api/asignaciones-cartera', paramsGestor).then(res => setAsignaciones(res.data)).catch(console.error);
     axios.get('http://localhost:8080/api/tickets', params).then(res => setTickets(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/gestiones', params).then(res => setGestiones(res.data)).catch(console.error);
+    axios.get('http://localhost:8080/api/asignaciones-cartera', paramsGestor).then(res => setAsignaciones(res.data)).catch(console.error);
   };
 
   useEffect(() => {
     if (empleadoAutenticado) {
       const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
-      axios.get('http://localhost:8080/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
       axios.get('http://localhost:8080/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
       axios.get('http://localhost:8080/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/tipos-promesa', params).then(res => setTiposPromesa(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/tipos-ticket', params).then(res => setTiposTicket(res.data)).catch(console.error);
-      axios.get('http://localhost:8080/api/asignaciones-cartera', { params: { empleadoId: empleadoAutenticado.idEmpleado } }).then(res => setAsignaciones(res.data)).catch(console.error);
+      if (esGestor) {
+        axios.get('http://localhost:8080/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
+        axios.get('http://localhost:8080/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
+        axios.get('http://localhost:8080/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
+        axios.get('http://localhost:8080/api/tipos-promesa', params).then(res => setTiposPromesa(res.data)).catch(console.error);
+        axios.get('http://localhost:8080/api/tipos-ticket', params).then(res => setTiposTicket(res.data)).catch(console.error);
+        axios.get('http://localhost:8080/api/asignaciones-cartera', { params: { empleadoId: empleadoAutenticado.idEmpleado } }).then(res => setAsignaciones(res.data)).catch(console.error);
+      }
       recargarDatosDinamicos();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -89,6 +117,9 @@ function App() {
       });
 
       if (response.status === 200) {
+        localStorage.setItem('token', response.data.token);
+        localStorage.setItem('rol', response.data.rol);
+        localStorage.setItem('empleado', JSON.stringify(response.data));
         setEmpleadoAutenticado(response.data);
       }
     } catch (err) {
@@ -133,6 +164,9 @@ function App() {
   };
 
   const cerrarSesion = () => {
+    localStorage.removeItem('token');
+    localStorage.removeItem('rol');
+    localStorage.removeItem('empleado');
     setEmpleadoAutenticado(null);
     setVistaActual('info');
     setTabInfo('info');
@@ -261,19 +295,19 @@ function App() {
         </div>
         
         <nav className="flex-1 px-3 py-6 space-y-2 overflow-y-auto">
-          <div className="mb-1">
-            <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Gestión/Info</p>
-            <button onClick={() => setVistaActual('info')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'info' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Info/Gestión</button>
-            {empleadoAutenticado.rol !== 'SUPERVISOR' && (
+          {seccionesPermitidas(empleadoAutenticado.rol).includes('gestion') && (
+            <div className="mb-1">
+              <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Gestión/Info</p>
+              <button onClick={() => setVistaActual('info')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'info' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Info/Gestión</button>
               <button onClick={() => setVistaActual('cartera')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'cartera' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Mi Cartera</button>
-            )}
-            <button onClick={() => setVistaActual('meta')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'meta' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>{empleadoAutenticado.rol === 'SUPERVISOR' ? '🎯 Meta del Equipo' : '🎯 Mi Meta'}</button>
-          </div>
+              <button onClick={() => setVistaActual('meta')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'meta' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🎯 Mi Meta</button>
+            </div>
+          )}
 
-          {empleadoAutenticado.rol === 'ADMINISTRADOR' && (
+          {seccionesPermitidas(empleadoAutenticado.rol).includes('administracion') && (
             <div className="pt-4 mt-4 border-t border-slate-800">
               <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Administración</p>
-              <button onClick={() => setVistaActual('empleados')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'empleados' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Directorio de Empleados</button>
+              <button onClick={() => setVistaActual('empleados')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'empleados' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Alta / Baja de Empleados</button>
               <button onClick={() => setVistaActual('asignacion')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'asignacion' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Asignar Cartera</button>
               <button onClick={() => setVistaActual('catalogos')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'catalogos' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>⚙️ Catálogos Operativos</button>
               <button onClick={() => setVistaActual('auditoria')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'auditoria' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🛡️ Bitácora de Auditoría</button>
@@ -281,12 +315,13 @@ function App() {
             </div>
           )}
 
-          {empleadoAutenticado.rol === 'SUPERVISOR' && (
+          {seccionesPermitidas(empleadoAutenticado.rol).includes('supervision') && (
             <div className="pt-4 mt-4 border-t border-slate-800">
               <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Supervisión</p>
               <button onClick={() => setVistaActual('supervision')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'supervision' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👁️ Monitoreo de Equipo</button>
               <button onClick={() => setVistaActual('asignacionSup')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'asignacionSup' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Asignar Carteras</button>
               <button onClick={() => setVistaActual('promesasSup')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'promesasSup' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🎁 Promesas del Equipo</button>
+              <button onClick={() => setVistaActual('metaEquipo')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'metaEquipo' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🎯 Meta del Equipo</button>
             </div>
           )}
         </nav>
@@ -309,7 +344,7 @@ function App() {
 
       <main className="flex-1 overflow-y-auto p-8">
         <div className="max-w-5xl mx-auto">
-          {vistaActual === 'info' && (
+          {vistaActual === 'info' && empleadoAutenticado.rol === 'GESTOR' && (
             <InfoGestion
               terminoBusqueda={terminoBusqueda}
               onTerminoChange={setTerminoBusqueda}
@@ -334,20 +369,19 @@ function App() {
               onDatosActualizados={recargarDatosDinamicos}
             />
           )}
-          {vistaActual === 'cartera' && (
+          {vistaActual === 'cartera' && empleadoAutenticado.rol === 'GESTOR' && (
             <CarteraGestor
               asignaciones={asignaciones}
               onSeleccionar={seleccionarParaGestion}
             />
           )}
-          {vistaActual === 'meta' && (empleadoAutenticado.rol === 'SUPERVISOR' ? (
-            <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />
-          ) : (
+          {vistaActual === 'meta' && empleadoAutenticado.rol === 'GESTOR' && (
             <MiMeta
               empleadoActual={empleadoAutenticado}
               gestiones={gestiones}
             />
-          ))}
+          )}
+          {vistaActual === 'metaEquipo' && empleadoAutenticado.rol === 'SUPERVISOR' && <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />}
           {vistaActual === 'campanas' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
           {vistaActual === 'empleados' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><EmpleadosManager empresaId={empleadoAutenticado.idEmpresa} /></div>}
           {vistaActual === 'asignacion' && empleadoAutenticado.rol === 'ADMINISTRADOR' && <div className="animate-fade-in"><AsignacionCartera empresaId={empleadoAutenticado.idEmpresa} /></div>}

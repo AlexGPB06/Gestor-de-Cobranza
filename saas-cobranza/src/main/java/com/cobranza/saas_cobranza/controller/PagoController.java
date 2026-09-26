@@ -1,14 +1,18 @@
 package com.cobranza.saas_cobranza.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.*;
-import java.util.List;
-
-// --- ESTAS SON LAS IMPORTACIONES QUE FALTABAN ---
-import com.cobranza.saas_cobranza.Pago;
 import com.cobranza.saas_cobranza.Deuda;
-import com.cobranza.saas_cobranza.repository.PagoRepository;
+import com.cobranza.saas_cobranza.Pago;
 import com.cobranza.saas_cobranza.repository.DeudaRepository;
+import com.cobranza.saas_cobranza.repository.PagoRepository;
+import com.cobranza.saas_cobranza.util.Seguridad;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.math.BigDecimal;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/pagos")
@@ -22,26 +26,47 @@ public class PagoController {
     private DeudaRepository deudaRepository;
 
     @GetMapping
-    public List<Pago> listarPagos(@RequestParam(required = false) Long empresaId) {
-        if (empresaId != null) {
-            return pagoRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId);
+    public ResponseEntity<?> listarPagos(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                         @RequestParam(required = false) Long empresaId) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
         }
-        return pagoRepository.findAll();
+        if (empresaId != null) {
+            return ResponseEntity.ok(pagoRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId));
+        }
+        return ResponseEntity.ok(pagoRepository.findAll());
     }
 
     @PostMapping
-    public Pago registrarPago(@RequestBody Pago pago) {
-        // 1. Buscamos la deuda a la que se le está abonando
-        Deuda deudaOriginal = deudaRepository.findById(pago.getDeuda().getIdDeuda())
-                .orElseThrow(() -> new RuntimeException("Deuda no encontrada"));
-        
-        // 2. Lógica de negocio: Restamos el monto del pago al saldo pendiente
+    @Transactional
+    public ResponseEntity<?> registrarPago(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                           @RequestBody Pago pago) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
+
+        if (pago.getDeuda() == null || pago.getDeuda().getIdDeuda() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("La deuda del pago es obligatoria");
+        }
+
+        Deuda deudaOriginal = deudaRepository.findById(pago.getDeuda().getIdDeuda()).orElse(null);
+        if (deudaOriginal == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Deuda no encontrada");
+        }
+        if (deudaOriginal.getSaldoPendiente() == null || pago.getMonto() == null
+                || pago.getMonto().compareTo(BigDecimal.ZERO) <= 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El monto del pago debe ser mayor a cero");
+        }
+        if (pago.getMonto().compareTo(deudaOriginal.getSaldoPendiente()) > 0) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El pago excede el saldo pendiente de la deuda");
+        }
+
         deudaOriginal.setSaldoPendiente(deudaOriginal.getSaldoPendiente().subtract(pago.getMonto()));
-        
-        // 3. Guardamos el nuevo saldo en la base de datos
         deudaRepository.save(deudaOriginal);
 
-        // 4. Guardamos el registro histórico del pago
-        return pagoRepository.save(pago);
+        return ResponseEntity.ok(pagoRepository.save(pago));
     }
-}      
+}

@@ -19,7 +19,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 @Component
-@ConditionalOnProperty(name = "saas.cobranza.semillas", havingValue = "true", matchIfMissing = true)
+@ConditionalOnProperty(name = "saas.cobranza.semillas", havingValue = "true")
 public class DataSeeder implements CommandLineRunner {
 
     @Autowired

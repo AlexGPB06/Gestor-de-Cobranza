@@ -6,6 +6,8 @@ import com.cobranza.saas_cobranza.Empleado;
 import com.cobranza.saas_cobranza.repository.AsignacionCarteraRepository;
 import com.cobranza.saas_cobranza.repository.DeudaRepository;
 import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
+import com.cobranza.saas_cobranza.util.JwtUtil;
+import com.cobranza.saas_cobranza.util.Seguridad;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -29,25 +31,61 @@ public class AsignacionCarteraController {
     @Autowired
     private DeudaRepository deudaRepository;
 
+    /**
+     * El gestor solo ve su propia cartera. Administrador y supervisor
+     * necesitan el listado completo para asignar carteras.
+     */
     @GetMapping
-    public List<AsignacionCartera> listarTodos(@RequestParam(required = false) Long empresaId,
-                                              @RequestParam(required = false) Long empleadoId) {
+    public ResponseEntity<?> listarTodos(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                         @RequestParam(required = false) Long empresaId,
+                                         @RequestParam(required = false) Long empleadoId) {
+        JwtUtil.Sesion sesion = Seguridad.sesion(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (Seguridad.esGestor(sesion)) {
+            return ResponseEntity.ok(
+                    repository.findByEmpleado_IdEmpleadoAndEstatusActivaTrue(sesion.idEmpleado()));
+        }
+        if (!Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del gestor, el administrador o el supervisor.");
+        }
+        if (Seguridad.esSupervisor(sesion) && empleadoId != null && !empleadoId.equals(sesion.idEmpleado())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Un supervisor solo puede consultar las carteras de su propio equipo.");
+        }
         if (empleadoId != null) {
-            return repository.findByEmpleado_IdEmpleadoAndEstatusActivaTrue(empleadoId);
+            return ResponseEntity.ok(repository.findByEmpleado_IdEmpleadoAndEstatusActivaTrue(empleadoId));
         }
         if (empresaId != null) {
-            return repository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId);
+            return ResponseEntity.ok(repository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId));
         }
-        return repository.findAll();
+        return ResponseEntity.ok(repository.findAll());
     }
 
     @PostMapping
-    public AsignacionCartera crear(@RequestBody AsignacionCartera asignacion) {
-        return repository.save(asignacion);
+    public ResponseEntity<?> crear(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                   @RequestBody AsignacionCartera asignacion) {
+        ResponseEntity<?> bloqueado = Seguridad.soloAdmin(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
+        if (asignacion.getEmpleado() == null || asignacion.getEmpleado().getIdEmpleado() == null
+                || asignacion.getDeuda() == null || asignacion.getDeuda().getIdDeuda() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("La asignación requiere el empleado y la deuda");
+        }
+        return ResponseEntity.ok(repository.save(asignacion));
     }
 
     @PostMapping("/por-lote")
-    public ResponseEntity<?> crearPorLote(@RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> crearPorLote(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                          @RequestBody Map<String, Object> body) {
+        ResponseEntity<?> bloqueado = Seguridad.soloAdmin(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         Object empleadoRaw = body.get("empleadoId");
         Object deudasRaw = body.get("deudaIds");
         if (empleadoRaw == null || deudasRaw == null) {

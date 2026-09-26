@@ -215,7 +215,7 @@ class GestionPromesaTest {
         Map<String, Object> body = new HashMap<>();
         body.put("montoPagado", "no-es-un-numero");
 
-        ResponseEntity<?> response = gestionController.actualizarMontoPagado(500L, body);
+        ResponseEntity<?> response = gestionController.actualizarMontoPagado(tokenGestor(), 500L, body);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertEquals("El monto pagado no es válido", response.getBody());
@@ -230,7 +230,7 @@ class GestionPromesaTest {
         Map<String, Object> body = new HashMap<>();
         body.put("estado", "CUALQUIER_COSA");
 
-        ResponseEntity<?> response = gestionController.actualizarEstadoBonificacion(500L, body);
+        ResponseEntity<?> response = gestionController.actualizarEstadoBonificacion(tokenGestor(), 500L, body);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         assertEquals("Estado no válido", response.getBody());
@@ -246,7 +246,7 @@ class GestionPromesaTest {
         Map<String, Object> body = new HashMap<>();
         body.put("estado", "aprobada");
 
-        ResponseEntity<?> response = gestionController.actualizarEstadoBonificacion(500L, body);
+        ResponseEntity<?> response = gestionController.actualizarEstadoBonificacion(tokenGestor(), 500L, body);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals("APROBADA", ((Gestion) response.getBody()).getEstadoBonificacion());
@@ -259,7 +259,7 @@ class GestionPromesaTest {
         Map<String, Object> body = new HashMap<>();
         body.put("montoPagado", "100");
 
-        ResponseEntity<?> response = gestionController.actualizarMontoPagado(999L, body);
+        ResponseEntity<?> response = gestionController.actualizarMontoPagado(tokenGestor(), 999L, body);
 
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
         assertEquals("La gestión no existe", response.getBody());
@@ -275,7 +275,7 @@ class GestionPromesaTest {
         Map<String, Object> body = new HashMap<>();
         body.put("montoPagado", 2500.75);
 
-        ResponseEntity<?> response = gestionController.actualizarMontoPagado(500L, body);
+        ResponseEntity<?> response = gestionController.actualizarMontoPagado(tokenGestor(), 500L, body);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertEquals(new BigDecimal("2500.75"), ((Gestion) response.getBody()).getMontoPagado());

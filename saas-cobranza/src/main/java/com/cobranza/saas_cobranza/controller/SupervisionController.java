@@ -2,7 +2,9 @@ package com.cobranza.saas_cobranza.controller;
 
 import com.cobranza.saas_cobranza.*;
 import com.cobranza.saas_cobranza.repository.*;
+import com.cobranza.saas_cobranza.util.Seguridad;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
@@ -49,8 +51,13 @@ public class SupervisionController {
     }
 
     @GetMapping("/equipo")
-    public List<Map<String, Object>> equipo(@RequestParam Long supervisorId,
-                                            @RequestParam(required = false) String periodo) {
+    public ResponseEntity<?> equipo(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                   @RequestParam Long supervisorId,
+                                   @RequestParam(required = false) String periodo) {
+        ResponseEntity<?> bloqueado = Seguridad.supervisorSobreSiMismo(authorization, supervisorId);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         LocalDateTime desde = inicioPeriodo(periodo);
         LocalDate hoy = LocalDate.now();
         List<Empleado> equipo = equipoDe(supervisorId);
@@ -120,17 +127,22 @@ public class SupervisionController {
             fila.put("ultimasGestiones", ultimas);
             resultado.add(fila);
         }
-        return resultado;
+        return ResponseEntity.ok(resultado);
     }
 
     @GetMapping("/promesas")
-    public List<Gestion> promesas(@RequestParam Long supervisorId,
-                                  @RequestParam(required = false) String periodo) {
+    public ResponseEntity<?> promesas(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                      @RequestParam Long supervisorId,
+                                      @RequestParam(required = false) String periodo) {
+        ResponseEntity<?> bloqueado = Seguridad.supervisorSobreSiMismo(authorization, supervisorId);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         LocalDateTime desde = inicioPeriodo(periodo);
         List<Long> ids = equipoDe(supervisorId).stream().map(Empleado::getIdEmpleado).toList();
-        return gestionesDelEquipo(ids, desde).stream()
+        return ResponseEntity.ok(gestionesDelEquipo(ids, desde).stream()
                 .filter(g -> g.getMontoPromesa() != null)
                 .sorted(Comparator.comparing(Gestion::getFechaRegistro, Comparator.nullsLast(Comparator.reverseOrder())))
-                .collect(Collectors.toList());
+                .collect(Collectors.toList()));
     }
 }

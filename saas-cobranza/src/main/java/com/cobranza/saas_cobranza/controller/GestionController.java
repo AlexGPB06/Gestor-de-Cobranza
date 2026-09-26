@@ -15,6 +15,7 @@ import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
 import com.cobranza.saas_cobranza.repository.MetaRepository;
 import com.cobranza.saas_cobranza.repository.TipoPromesaRepository;
 import com.cobranza.saas_cobranza.util.JwtUtil;
+import com.cobranza.saas_cobranza.util.Seguridad;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
@@ -58,16 +59,36 @@ public class GestionController {
     @Autowired
     private MetaRepository metaRepository;
 
+    /**
+     * El gestor solo ve sus propias gestiones, aunque pida el id de otro
+     * empleado. El supervisor y el administrador consultan las de su ambito.
+     */
     @GetMapping
-    public List<Gestion> obtenerTodas(@RequestParam(required = false) Long empresaId,
-                                      @RequestParam(required = false) Long empleadoId) {
+    public ResponseEntity<?> obtenerTodas(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                         @RequestParam(required = false) Long empresaId,
+                                         @RequestParam(required = false) Long empleadoId) {
+        JwtUtil.Sesion sesion = Seguridad.sesion(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (Seguridad.esGestor(sesion)) {
+            return ResponseEntity.ok(gestionRepository.findByEmpleado_IdEmpleado(sesion.idEmpleado()));
+        }
+        if (!Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del gestor, el administrador o el supervisor.");
+        }
+        if (Seguridad.esSupervisor(sesion) && empleadoId != null && !empleadoId.equals(sesion.idEmpleado())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Un supervisor solo puede consultar los datos de su propio equipo.");
+        }
         if (empleadoId != null) {
-            return gestionRepository.findByEmpleado_IdEmpleado(empleadoId);
+            return ResponseEntity.ok(gestionRepository.findByEmpleado_IdEmpleado(empleadoId));
         }
         if (empresaId != null) {
-            return gestionRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId);
+            return ResponseEntity.ok(gestionRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(empresaId));
         }
-        return gestionRepository.findAll();
+        return ResponseEntity.ok(gestionRepository.findAll());
     }
 
     private boolean esConceptoPromesa(Concepto concepto) {
@@ -101,11 +122,11 @@ public class GestionController {
         }
         if (sesion.tieneRol(ROL_SUPERVISOR)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("El supervisor solo puede dar de alta metas");
+                    .body("El supervisor no registra gestiones: solo da de alta metas y supervisa a su equipo");
         }
-        if (!sesion.tieneRol(ROL_GESTOR, ROL_ADMIN)) {
+        if (!sesion.tieneRol(ROL_GESTOR)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Solo el gestor o el administrador pueden registrar gestiones");
+                    .body("Solo el gestor puede registrar gestiones");
         }
 
         Empleado empleadoAutenticado = empleadoRepository.findById(sesion.idEmpleado()).orElse(null);
@@ -221,9 +242,18 @@ public class GestionController {
                 .body("Otro usuario actualizó esta gestión al mismo tiempo. Vuelve a cargarla e intenta de nuevo.");
     }
 
+    /**
+     * El monto pagado es dinero: solo el gestor que hizo la promesa lo captura.
+     */
     @PutMapping("/{id}/monto-pagado")
     @Transactional
-    public ResponseEntity<?> actualizarMontoPagado(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> actualizarMontoPagado(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                                   @PathVariable Long id,
+                                                   @RequestBody Map<String, Object> body) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La gestión no existe");
@@ -248,12 +278,45 @@ public class GestionController {
         return ResponseEntity.ok(actualizada);
     }
 
+    /**
+     * La promesa la captura el gestor que la negocia y el supervisor de ese
+     * gestor puede revisarla. Ni el administrador ni otro supervisor tocan esto.
+     */
+    private ResponseEntity<?> gestorOSupervisorDeLaGestion(String authorization, Gestion gestion) {
+        JwtUtil.Sesion sesion = Seguridad.sesion(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (Seguridad.esGestor(sesion)) {
+            return null;
+        }
+        if (Seguridad.esSupervisor(sesion)) {
+            Long idGestor = gestion.getEmpleado() == null ? null : gestion.getEmpleado().getIdEmpleado();
+            boolean esMio = idGestor != null && empleadoRepository.findById(idGestor)
+                    .map(e -> e.getSupervisor() != null
+                            && e.getSupervisor().getIdEmpleado().equals(sesion.idEmpleado()))
+                    .orElse(false);
+            if (esMio) {
+                return null;
+            }
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Un supervisor solo puede modificar las promesas de su propio equipo.");
+        }
+        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Seguridad.MENSAJE_NO_GESTOR);
+    }
+
     @PutMapping("/{id}/estado-bonificacion")
     @Transactional
-    public ResponseEntity<?> actualizarEstadoBonificacion(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> actualizarEstadoBonificacion(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                                         @PathVariable Long id,
+                                                         @RequestBody Map<String, Object> body) {
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La gestión no existe");
+        }
+        ResponseEntity<?> bloqueado = gestorOSupervisorDeLaGestion(authorization, gestionOpt.get());
+        if (bloqueado != null) {
+            return bloqueado;
         }
         Object estado = body.get("estado");
         if (estado == null || estado.toString().isBlank()) {
@@ -270,10 +333,16 @@ public class GestionController {
 
     @PutMapping("/{id}/promesa")
     @Transactional
-    public ResponseEntity<?> modificarPromesa(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+    public ResponseEntity<?> modificarPromesa(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                              @PathVariable Long id,
+                                              @RequestBody Map<String, Object> body) {
         Optional<Gestion> gestionOpt = gestionRepository.findById(id);
         if (gestionOpt.isEmpty()) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La gestión no existe");
+        }
+        ResponseEntity<?> bloqueado = gestorOSupervisorDeLaGestion(authorization, gestionOpt.get());
+        if (bloqueado != null) {
+            return bloqueado;
         }
         Gestion gestion = gestionOpt.get();
 

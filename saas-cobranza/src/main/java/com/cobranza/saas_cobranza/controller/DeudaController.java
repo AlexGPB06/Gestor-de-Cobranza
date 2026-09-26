@@ -2,7 +2,10 @@ package com.cobranza.saas_cobranza.controller;
 
 import com.cobranza.saas_cobranza.Deuda;
 import com.cobranza.saas_cobranza.repository.DeudaRepository;
+import com.cobranza.saas_cobranza.util.JwtUtil;
+import com.cobranza.saas_cobranza.util.Seguridad;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -14,16 +17,35 @@ public class DeudaController {
     @Autowired
     private DeudaRepository deudaRepository;
 
+    /**
+     * Lectura: la necesitan el gestor (su cartera), el administrador y el
+     * supervisor porque "Asignar Cartera" muestra las deudas por asignar.
+     * Alta de deuda: solo el gestor.
+     */
     @GetMapping
-    public List<Deuda> obtenerTodas(@RequestParam(required = false) Long empresaId) {
-        if (empresaId != null) {
-            return deudaRepository.findByDeudor_Campana_Empresa_IdEmpresa(empresaId);
+    public ResponseEntity<?> obtenerTodas(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                          @RequestParam(required = false) Long empresaId) {
+        JwtUtil.Sesion sesion = Seguridad.sesion(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
         }
-        return deudaRepository.findAll();
+        if (!Seguridad.esGestor(sesion) && !Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(org.springframework.http.HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del gestor, el administrador o el supervisor.");
+        }
+        if (empresaId != null) {
+            return ResponseEntity.ok(deudaRepository.findByDeudor_Campana_Empresa_IdEmpresa(empresaId));
+        }
+        return ResponseEntity.ok(deudaRepository.findAll());
     }
 
     @PostMapping
-    public Deuda crearDeuda(@RequestBody Deuda deuda) {
-        return deudaRepository.save(deuda);
+    public ResponseEntity<?> crearDeuda(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                        @RequestBody Deuda deuda) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
+        return ResponseEntity.ok(deudaRepository.save(deuda));
     }
 }

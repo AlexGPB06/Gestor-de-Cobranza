@@ -5,6 +5,7 @@ import com.cobranza.saas_cobranza.repository.AsignacionCarteraRepository;
 import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
 import com.cobranza.saas_cobranza.repository.GestionRepository;
 import com.cobranza.saas_cobranza.repository.TicketRepository;
+import com.cobranza.saas_cobranza.util.JwtUtil;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.InjectMocks;
@@ -46,6 +47,21 @@ class SupervisionControllerTest {
 
     @Mock
     private TicketRepository ticketRepository;
+
+    private String tokenSupervisor() {
+        return "Bearer " + JwtUtil.generarToken(String.valueOf(ID_SUPERVISOR), "SUPERVISOR",
+                "supervisor.s1", "S1SUP");
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Map<String, Object>> equipoDe(String token, String periodo) {
+        return (List<Map<String, Object>>) supervisionController.equipo(token, ID_SUPERVISOR, periodo).getBody();
+    }
+
+    @SuppressWarnings("unchecked")
+    private List<Gestion> promesasDe(String token) {
+        return (List<Gestion>) supervisionController.promesas(token, ID_SUPERVISOR, null).getBody();
+    }
 
     private Empleado gestorUno;
     private Empleado gestorDos;
@@ -110,7 +126,7 @@ class SupervisionControllerTest {
                         gestion(gestorDos, null, 2)));
         when(ticketRepository.findByEmpleadoOrigen_IdEmpleadoIn(any())).thenReturn(List.of());
 
-        List<Map<String, Object>> filas = supervisionController.equipo(ID_SUPERVISOR, null);
+        List<Map<String, Object>> filas = equipoDe(tokenSupervisor(), null);
 
         assertEquals(2, filas.size());
 
@@ -141,7 +157,7 @@ class SupervisionControllerTest {
         when(ticketRepository.findByEmpleadoOrigen_IdEmpleadoInAndFechaCreacionGreaterThanEqual(any(), any()))
                 .thenReturn(List.of());
 
-        List<Map<String, Object>> filas = supervisionController.equipo(ID_SUPERVISOR, "HOY");
+        List<Map<String, Object>> filas = equipoDe(tokenSupervisor(), "HOY");
 
         assertEquals(1, filas.size());
         assertEquals(1, filas.get(0).get("gestiones"));
@@ -158,7 +174,7 @@ class SupervisionControllerTest {
                 gestion(gestorDos, null, 1),
                 gestion(gestorUno, new BigDecimal("150.00"), 2)));
 
-        List<Gestion> promesas = supervisionController.promesas(ID_SUPERVISOR, null);
+        List<Gestion> promesas = promesasDe(tokenSupervisor());
 
         assertEquals(2, promesas.size());
         assertEquals(new BigDecimal("300.00"), promesas.get(0).getMontoPromesa());
@@ -169,7 +185,7 @@ class SupervisionControllerTest {
     void equipo_SinEquipoAsignado_DeberaDevolverListaVacia() {
         when(empleadoRepository.findBySupervisor_IdEmpleado(ID_SUPERVISOR)).thenReturn(List.of());
 
-        List<Map<String, Object>> filas = supervisionController.equipo(ID_SUPERVISOR, "MES");
+        List<Map<String, Object>> filas = equipoDe(tokenSupervisor(), "MES");
 
         assertEquals(0, filas.size());
         verify(asignacionCarteraRepository, never())

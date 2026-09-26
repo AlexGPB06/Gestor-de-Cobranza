@@ -143,19 +143,19 @@ export default function SupervisionPanel({ supervisorId }) {
                     <div className="font-bold text-slate-800">{fila.empleado.nombreCompleto}</div>
                     <div className="text-xs text-slate-400 font-mono">{fila.empleado.numeroEmpleado}</div>
                   </td>
-                  <td className="px-4 py-4 font-semibold text-slate-700">{fila.cuentasAsignadas}</td>
+                  <td className="px-4 py-4 font-semibold text-slate-700">{fila.cuentasAsignadas ?? 0}</td>
                   <td className="px-4 py-4 font-semibold text-emerald-700">{formatearDinero(fila.saldoTotal)}</td>
                   <td className="px-4 py-4 text-slate-600">{formatearDinero(fila.saldoMora1y2)}</td>
                   <td className="px-4 py-4 text-slate-600">{formatearDinero(fila.saldoMora3y4)}</td>
                   <td className="px-4 py-4 text-slate-600">{formatearDinero(fila.saldoMora5y6)}</td>
                   <td className="px-4 py-4">
                     <div className="flex flex-wrap items-center gap-1">
-                      <Badge clase="bg-indigo-100 text-indigo-700">{fila.gestiones} gestiones</Badge>
-                      <Badge clase={`${fila.promesas > 0 ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>{fila.promesas} promesas</Badge>
+                      <Badge clase="bg-indigo-100 text-indigo-700">{fila.gestiones ?? 0} gestiones</Badge>
+                      <Badge clase={`${fila.promesas > 0 ? 'bg-violet-100 text-violet-700' : 'bg-slate-100 text-slate-500'}`}>{fila.promesas ?? 0} promesas</Badge>
                       {fila.promocionesPendientes > 0 && <Badge clase="bg-amber-100 text-amber-700">{fila.promocionesPendientes} pend.</Badge>}
                     </div>
                   </td>
-                  <td className="px-4 py-4 text-slate-700 font-semibold">{fila.tickets}</td>
+                  <td className="px-4 py-4 text-slate-700 font-semibold">{fila.tickets ?? 0}</td>
                   <td className="px-4 py-4">
                     <button onClick={() => abrirGestionesDe(fila.empleado)} className="text-blue-600 hover:text-blue-800 font-bold text-xs">👁 Ver gestiones</button>
                   </td>

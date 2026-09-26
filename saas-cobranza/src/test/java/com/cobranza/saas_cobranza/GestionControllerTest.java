@@ -112,7 +112,18 @@ class GestionControllerTest {
                 token("SUPERVISOR", ID_SUPERVISOR), gestionBase());
 
         assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
-        assertEquals("El supervisor solo puede dar de alta metas", response.getBody());
+        assertEquals("El supervisor no registra gestiones: solo da de alta metas y supervisa a su equipo",
+                response.getBody());
+        verify(gestionRepository, never()).save(any(Gestion.class));
+    }
+
+    @Test
+    void crearGestion_Administrador_DeberiaRetornar403() {
+        ResponseEntity<?> response = gestionController.crearGestion(
+                token("ADMINISTRADOR", 1L), gestionBase());
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+        assertEquals("Solo el gestor puede registrar gestiones", response.getBody());
         verify(gestionRepository, never()).save(any(Gestion.class));
     }
 

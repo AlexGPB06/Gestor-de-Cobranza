@@ -406,16 +406,16 @@ class GestionConcurrenciaTest {
         assertEquals(HttpStatus.OK, promesaCreada.getStatusCode());
         Long idGestion = ((Gestion) promesaCreada.getBody()).getIdGestion();
 
-        ResponseEntity<?> excedido = gestionController.actualizarMontoPagado(
+        ResponseEntity<?> excedido = gestionController.actualizarMontoPagado(tokenGestorA,
                 idGestion, Map.of("montoPagado", "1500.00"));
         assertEquals(HttpStatus.BAD_REQUEST, excedido.getStatusCode());
         assertTrue(String.valueOf(excedido.getBody()).contains("no puede superar el monto prometido"));
 
-        ResponseEntity<?> negativo = gestionController.actualizarMontoPagado(
+        ResponseEntity<?> negativo = gestionController.actualizarMontoPagado(tokenGestorA,
                 idGestion, Map.of("montoPagado", "-50.00"));
         assertEquals(HttpStatus.BAD_REQUEST, negativo.getStatusCode());
 
-        ResponseEntity<?> valido = gestionController.actualizarMontoPagado(
+        ResponseEntity<?> valido = gestionController.actualizarMontoPagado(tokenGestorA,
                 idGestion, Map.of("montoPagado", "1000.00"));
         assertEquals(HttpStatus.OK, valido.getStatusCode());
     }

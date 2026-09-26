@@ -8,6 +8,7 @@ import com.cobranza.saas_cobranza.repository.TicketRepository;
 import com.cobranza.saas_cobranza.repository.DeudaRepository;
 import com.cobranza.saas_cobranza.repository.DepartamentoRepository;
 import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
+import com.cobranza.saas_cobranza.util.Seguridad;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -35,8 +36,13 @@ public class TicketController {
     private EmpleadoRepository empleadoRepository;
 
     @GetMapping
-    public ResponseEntity<List<Ticket>> listar(@RequestParam(required = false) Long empresaId,
-                                               @RequestParam(required = false) Long deudaId) {
+    public ResponseEntity<?> listar(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                   @RequestParam(required = false) Long empresaId,
+                                   @RequestParam(required = false) Long deudaId) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         if (deudaId != null) {
             return ResponseEntity.ok(ticketRepository.findByDeuda_IdDeuda(deudaId));
         }
@@ -47,7 +53,12 @@ public class TicketController {
     }
 
     @PostMapping
-    public ResponseEntity<?> registrar(@RequestBody Map<String, Object> datos) {
+    public ResponseEntity<?> registrar(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                       @RequestBody Map<String, Object> datos) {
+        ResponseEntity<?> bloqueado = Seguridad.soloGestor(authorization);
+        if (bloqueado != null) {
+            return bloqueado;
+        }
         String numero = datos.get("numero") == null ? null : datos.get("numero").toString();
         String asunto = datos.get("asunto") == null ? null : datos.get("asunto").toString();
         String descripcion = datos.get("descripcion") == null ? null : datos.get("descripcion").toString();
