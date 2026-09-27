@@ -24,8 +24,7 @@ export default function EmpleadosManager({ empresaId }) {
   const [codigoEmpresa, setCodigoEmpresa] = useState('');
   const [rolSeleccionado, setRolSeleccionado] = useState('GESTOR');
   const [supervisorSel, setSupervisorSel] = useState('');
-  const [editandoId, setEditandoId] = useState(null);
-  const [modoEdicion, setModoEdicion] = useState('rol'); // 'rol' | 'campana'
+  const [empleadoSel, setEmpleadoSel] = useState(null);
   const [rolEdit, setRolEdit] = useState('');
   const [campanaEdit, setCampanaEdit] = useState('');
 
@@ -150,7 +149,6 @@ export default function EmpleadosManager({ empresaId }) {
     try {
       const respuesta = await axios.put(`/api/empleados/${empleado.numeroEmpleado}/rol`, { rol: rolEdit });
       setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Rol actualizado' });
-      setEditandoId(null);
       await cargarDatos();
     } catch (error) {
       console.error("Error al cambiar el rol:", error);
@@ -175,7 +173,6 @@ export default function EmpleadosManager({ empresaId }) {
         idCampana: String(campanaEdit)
       });
       setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Campaña actualizada' });
-      setEditandoId(null);
       await cargarDatos();
     } catch (error) {
       console.error("Error al cambiar la campaña:", error);
@@ -211,6 +208,19 @@ export default function EmpleadosManager({ empresaId }) {
     if (rol === 'GESTOR') return 'bg-blue-100 text-blue-800';
     return 'bg-slate-100 text-slate-700';
   };
+
+  const abrirModal = (emp) => {
+    setEmpleadoSel(emp);
+    setRolEdit(emp.rol || 'GESTOR');
+    setCampanaEdit(String(campanaActivaDe(emp)[0]?.campana?.idCampana ?? ''));
+    setNotificacion({ tipo: '', mensaje: '' });
+  };
+
+  const sel = !empleadoSel
+    ? null
+    : empleadoSel.idEmpleado != null
+      ? empleados.find(e => e.idEmpleado === empleadoSel.idEmpleado) || empleadoSel
+      : empleadoSel;
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
@@ -291,7 +301,7 @@ export default function EmpleadosManager({ empresaId }) {
             </button>
           </form>
 
-          {notificacion.mensaje && (
+          {!empleadoSel && notificacion.mensaje && (
             <div className={`mt-4 p-3 rounded text-sm font-bold ${notificacion.tipo === 'exito' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
               {notificacion.mensaje}
             </div>
@@ -355,7 +365,11 @@ export default function EmpleadosManager({ empresaId }) {
                   empleadosFiltrados.map((emp) => {
                     const sinUsuario = !emp.usuario;
                     return (
-                      <tr key={emp.idEmpleado || emp.id} className="hover:bg-slate-50">
+                      <tr
+                        key={emp.idEmpleado || emp.id}
+                        className="hover:bg-slate-50 cursor-pointer"
+                        onClick={() => abrirModal(emp)}
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-mono text-xs text-blue-600 font-bold">{emp.numeroEmpleado || 'N/A'}</div>
                           <div className="font-bold text-slate-800">{emp.nombreCompleto}</div>
@@ -392,84 +406,13 @@ export default function EmpleadosManager({ empresaId }) {
                             <span className="px-2 py-1 inline-flex text-xs font-bold rounded-full bg-red-100 text-red-800">De baja</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {editandoId === emp.idEmpleado ? (
-                            <div className="flex items-center justify-center gap-1">
-                              {modoEdicion === 'campana' ? (
-                                <select
-                                  value={campanaEdit}
-                                  onChange={(e) => setCampanaEdit(e.target.value)}
-                                  className="p-1 border border-slate-300 rounded text-xs bg-white"
-                                >
-                                  <option value="">Selecciona campaña...</option>
-                                  {campanasDe(emp).map(c => (
-                                    <option key={c.idCampana} value={String(c.idCampana)}>{c.nombreEmpresa}</option>
-                                  ))}
-                                </select>
-                              ) : (
-                                <select
-                                  value={rolEdit}
-                                  onChange={(e) => setRolEdit(e.target.value)}
-                                  className="p-1 border border-slate-300 rounded text-xs bg-white"
-                                >
-                                  {ROLES.map(r => (
-                                    <option key={r} value={r}>{r}</option>
-                                  ))}
-                                </select>
-                              )}
-                              <button
-                                onClick={() => modoEdicion === 'campana' ? handleCambiarCampana(emp) : handleCambiarRol(emp)}
-                                className="px-2 py-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
-                              >
-                                Guardar
-                              </button>
-                              <button
-                                onClick={() => setEditandoId(null)}
-                                className="px-2 py-1 text-xs font-bold rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                              >
-                                Cancelar
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center gap-1 flex-wrap">
-                              {emp.activo && !sinUsuario && (
-                                <button
-                                  onClick={() => handleCambioEstado(emp, false)}
-                                  className="px-3 py-1 text-xs font-bold rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
-                                >
-                                  Dar de baja
-                                </button>
-                              )}
-                              {!emp.activo && !sinUsuario && (
-                                <button
-                                  onClick={() => handleCambioEstado(emp, true)}
-                                  className="px-3 py-1 text-xs font-bold rounded bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
-                                >
-                                  Reactivar
-                                </button>
-                              )}
-                              <button
-                                onClick={() => {
-                                  setEditandoId(emp.idEmpleado);
-                                  setModoEdicion('rol');
-                                  setRolEdit(emp.rol || 'GESTOR');
-                                }}
-                                className="px-3 py-1 text-xs font-bold rounded bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
-                              >
-                                Cambiar rol
-                              </button>
-                              <button
-                                onClick={() => {
-                                  setEditandoId(emp.idEmpleado);
-                                  setModoEdicion('campana');
-                                  setCampanaEdit(String(campanaActivaDe(emp)[0]?.campana?.idCampana ?? ''));
-                                }}
-                                className="px-3 py-1 text-xs font-bold rounded bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
-                              >
-                                Cambiar campaña
-                              </button>
-                            </div>
-                          )}
+                        <td className="px-6 py-4 whitespace-nowrap text-center" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => abrirModal(emp)}
+                            className="px-3 py-1 text-xs font-bold rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors"
+                          >
+                            Administrar
+                          </button>
                         </td>
                       </tr>
                     );
@@ -481,6 +424,119 @@ export default function EmpleadosManager({ empresaId }) {
         </div>
 
       </div>
+
+      {sel && (
+        <div
+          className="fixed inset-0 bg-slate-900/60 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Gestionar a ${sel.nombreCompleto}`}
+          onClick={(e) => { if (e.target === e.currentTarget) setEmpleadoSel(null); }}
+        >
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-lg p-6 space-y-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <div className="font-mono text-xs text-blue-600 font-bold">{sel.numeroEmpleado || 'N/A'}</div>
+                <h3 className="text-lg font-bold text-slate-800">{sel.nombreCompleto}</h3>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className={`px-2 py-1 inline-flex text-xs font-bold rounded-full ${!sel.usuario ? 'bg-yellow-100 text-yellow-800' : sel.activo ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {!sel.usuario ? 'Pendiente' : sel.activo ? 'Activo' : 'De baja'}
+                  </span>
+                  <span className={`px-2 py-1 inline-flex text-xs font-bold rounded-full ${estiloRol(sel.rol)}`}>
+                    {sel.rol || 'USUARIO'}
+                  </span>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setEmpleadoSel(null)}
+                aria-label="Cerrar"
+                className="text-slate-400 hover:text-slate-700 text-xl font-bold leading-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {notificacion.mensaje && (
+              <div className={`p-3 rounded text-sm font-bold ${notificacion.tipo === 'exito' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                {notificacion.mensaje}
+              </div>
+            )}
+
+            <section>
+              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Estatus</h4>
+              {sel.activo && sel.usuario ? (
+                <button
+                  type="button"
+                  onClick={() => handleCambioEstado(sel, false)}
+                  className="px-4 py-2 text-sm font-bold rounded bg-red-600 text-white hover:bg-red-700 transition-colors"
+                >
+                  Dar de baja
+                </button>
+              ) : !sel.activo && sel.usuario ? (
+                <button
+                  type="button"
+                  onClick={() => handleCambioEstado(sel, true)}
+                  className="px-4 py-2 text-sm font-bold rounded bg-green-600 text-white hover:bg-green-700 transition-colors"
+                >
+                  Reactivar
+                </button>
+              ) : (
+                <p className="text-xs text-slate-500 italic">
+                  Aún no crea su usuario. Entrégale su número de empleado para que se dé de alta con su contraseña.
+                </p>
+              )}
+            </section>
+
+            <section>
+              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Rol en el sistema</h4>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Rol"
+                  value={rolEdit}
+                  onChange={(e) => setRolEdit(e.target.value)}
+                  className="flex-1 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                >
+                  {ROLES.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarRol(sel)}
+                  className="px-4 py-2 text-sm font-bold rounded bg-purple-600 text-white hover:bg-purple-700 transition-colors"
+                >
+                  Guardar rol
+                </button>
+              </div>
+            </section>
+
+            <section>
+              <h4 className="text-xs font-bold text-slate-600 uppercase tracking-wider mb-2">Campaña asignada</h4>
+              <div className="flex gap-2">
+                <select
+                  aria-label="Campaña"
+                  value={campanaEdit}
+                  onChange={(e) => setCampanaEdit(e.target.value)}
+                  className="flex-1 p-2 border border-slate-300 rounded focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
+                >
+                  <option value="">Selecciona campaña...</option>
+                  {campanasDe(sel).map(c => (
+                    <option key={c.idCampana} value={String(c.idCampana)}>{c.nombreEmpresa}</option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleCambiarCampana(sel)}
+                  className="px-4 py-2 text-sm font-bold rounded bg-teal-600 text-white hover:bg-teal-700 transition-colors"
+                >
+                  Guardar campaña
+                </button>
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

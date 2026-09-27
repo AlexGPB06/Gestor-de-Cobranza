@@ -88,6 +88,13 @@ function prepararRespuestas({ empleados = DIRECTORIO, empresas = EMPRESAS, campa
 /** Los labels no tienen htmlFor, asi que se localizan los selectores por orden. */
 const selects = () => screen.getAllByRole('combobox');
 
+/** Abre el popup de gestion haciendo clic en la fila del empleado. */
+async function abrirModal(usuario, nombre) {
+  const fila = await screen.findByText(nombre);
+  await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /administrar/i }));
+  return await screen.findByRole('dialog');
+}
+
 beforeEach(() => {
   jest.clearAllMocks();
   window.confirm = jest.fn(() => true);
@@ -286,9 +293,8 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Verónica Castillo');
-    const boton = within(fila.closest('tr')).getByRole('button', { name: /baja/i });
-    await usuario.click(boton);
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.click(within(dialog).getByRole('button', { name: /dar de baja/i }));
 
     await waitFor(() =>
       expect(axios.post).toHaveBeenCalledWith('/api/empleados/estado', {
@@ -304,8 +310,8 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Verónica Castillo');
-    await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /baja/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.click(within(dialog).getByRole('button', { name: /dar de baja/i }));
 
     expect(axios.post).not.toHaveBeenCalled();
   });
@@ -315,8 +321,8 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Empleado De Baja');
-    await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /reactivar/i }));
+    const dialog = await abrirModal(usuario, 'Empleado De Baja');
+    await usuario.click(within(dialog).getByRole('button', { name: /reactivar/i }));
 
     await waitFor(() =>
       expect(axios.post).toHaveBeenCalledWith('/api/empleados/estado', {
@@ -327,14 +333,16 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
   });
 
   it('en un alta pendiente solo se ofrece cambiar el rol', async () => {
+    const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Alta Pendiente');
-    const celda = fila.closest('tr');
+    const dialog = await abrirModal(usuario, 'Alta Pendiente');
 
-    expect(within(celda).getByRole('button', { name: /cambiar rol/i })).toBeInTheDocument();
-    expect(within(celda).queryByRole('button', { name: /reactivar/i })).toBeNull();
-    expect(within(celda).queryByRole('button', { name: /eliminar/i })).toBeNull();
+    expect(within(dialog).getByRole('combobox', { name: 'Rol' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /guardar rol/i })).toBeInTheDocument();
+    expect(within(dialog).queryByRole('button', { name: /reactivar/i })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: /dar de baja/i })).toBeNull();
+    expect(within(dialog).queryByRole('button', { name: /eliminar/i })).toBeNull();
   });
 
   it('cambia el rol de un empleado tras confirmar', async () => {
@@ -342,11 +350,9 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Verónica Castillo');
-    const celda = fila.closest('tr');
-    await usuario.click(within(celda).getByRole('button', { name: /cambiar rol/i }));
-    await usuario.selectOptions(within(celda).getByRole('combobox'), 'SUPERVISOR');
-    await usuario.click(within(celda).getByRole('button', { name: /guardar/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.selectOptions(within(dialog).getByRole('combobox', { name: 'Rol' }), 'SUPERVISOR');
+    await usuario.click(within(dialog).getByRole('button', { name: /guardar rol/i }));
 
     await waitFor(() =>
       expect(axios.put).toHaveBeenCalledWith('/api/empleados/S1G01/rol', {
@@ -362,10 +368,8 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Verónica Castillo');
-    const celda = fila.closest('tr');
-    await usuario.click(within(celda).getByRole('button', { name: /cambiar rol/i }));
-    await usuario.click(within(celda).getByRole('button', { name: /guardar/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.click(within(dialog).getByRole('button', { name: /guardar rol/i }));
 
     expect(await screen.findByText('No puedes modificar tu propio rol')).toBeInTheDocument();
   });
@@ -376,8 +380,8 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Verónica Castillo');
-    await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /baja/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.click(within(dialog).getByRole('button', { name: /dar de baja/i }));
 
     expect(
       await screen.findByText('Solo el administrador puede dar de baja'),
@@ -405,10 +409,9 @@ describe('EmpleadosManager: columna y cambio de campaña', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
-    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
-    await usuario.selectOptions(within(fila).getByRole('combobox'), '12');
-    await usuario.click(within(fila).getByRole('button', { name: /guardar/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.selectOptions(within(dialog).getByRole('combobox', { name: 'Campaña' }), '12');
+    await usuario.click(within(dialog).getByRole('button', { name: /guardar campaña/i }));
 
     await waitFor(() =>
       expect(axios.put).toHaveBeenCalledWith('/api/empleados/S1G01/campana', {
@@ -422,10 +425,9 @@ describe('EmpleadosManager: columna y cambio de campaña', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
-    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
 
-    const opciones = [...within(fila).getByRole('combobox').options].map(o => o.textContent);
+    const opciones = [...within(dialog).getByRole('combobox', { name: 'Campaña' }).options].map(o => o.textContent);
     expect(opciones).toEqual(['Selecciona campaña...', 'Santander - Cobranza', 'Santander - Plus']);
     expect(opciones).not.toContain('BBVA - Cobranza');
   });
@@ -435,10 +437,9 @@ describe('EmpleadosManager: columna y cambio de campaña', () => {
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
-    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
-    await usuario.selectOptions(within(fila).getByRole('combobox'), '12');
-    await usuario.click(within(fila).getByRole('button', { name: /guardar/i }));
+    const dialog = await abrirModal(usuario, 'Verónica Castillo');
+    await usuario.selectOptions(within(dialog).getByRole('combobox', { name: 'Campaña' }), '12');
+    await usuario.click(within(dialog).getByRole('button', { name: /guardar campaña/i }));
 
     expect(axios.put).not.toHaveBeenCalled();
   });
