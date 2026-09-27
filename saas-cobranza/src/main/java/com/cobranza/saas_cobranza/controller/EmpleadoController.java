@@ -26,7 +26,7 @@ import java.util.regex.Pattern;
 
 @RestController
 @RequestMapping("/api/empleados")
-@CrossOrigin(origins = "http://localhost:5173")
+@CrossOrigin(origins = {"http://localhost:5173", "https://alexgpb06.github.io", "https://54-156-249-149.nip.io"})
 public class EmpleadoController {
 
     private static final Pattern CODIGO_EMPLEADO = Pattern.compile("^[A-Za-z0-9]{5}$");

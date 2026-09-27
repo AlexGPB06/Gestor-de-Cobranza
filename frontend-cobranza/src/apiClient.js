@@ -1,5 +1,8 @@
 import axios from 'axios';
 
+const baseCruda = (typeof window !== 'undefined' && window.__API_URL__) || '';
+axios.defaults.baseURL = !baseCruda || baseCruda === '__API_URL__' ? '' : baseCruda;
+
 const RUTAS_SIN_TOKEN = ['/empleados/login', '/empleados/activar'];
 
 axios.interceptors.request.use((config) => {
