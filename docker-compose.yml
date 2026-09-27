@@ -1,6 +1,7 @@
 services:
   db:
     image: mysql:8.0
+    restart: always
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-Password123}
       MYSQL_DATABASE: saas_cobranza_db
@@ -16,6 +17,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.backend
+    restart: always
     environment:
       SPRING_DATASOURCE_URL: "jdbc:mysql://db:3306/saas_cobranza_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true"
       SPRING_DATASOURCE_USERNAME: root
@@ -30,6 +32,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.frontend
+    restart: always
     ports:
       - "80:8080"
     depends_on:
@@ -37,6 +40,7 @@ services:
 
   caddy:
     image: caddy:2
+    restart: always
     profiles: ["aws"]
     ports:
       - "443:443"
