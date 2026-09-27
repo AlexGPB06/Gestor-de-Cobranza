@@ -62,9 +62,10 @@ export default function EmpleadosManager({ empresaId }) {
 
   const generarCodigoAleatorio = () => {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    const bytes = crypto.getRandomValues(new Uint8Array(5));
     let codigo = '';
     for (let i = 0; i < 5; i++) {
-      codigo += chars.charAt(Math.floor(Math.random() * chars.length));
+      codigo += chars.charAt(bytes[i] % chars.length);
     }
     setCodigoEmpresa(codigo);
   };

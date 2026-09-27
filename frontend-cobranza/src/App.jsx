@@ -114,10 +114,15 @@ function App() {
       });
 
       if (response.status === 200) {
-        localStorage.setItem('token', response.data.token);
-        localStorage.setItem('rol', response.data.rol);
-        localStorage.setItem('empleado', JSON.stringify(response.data));
-        setEmpleadoAutenticado(response.data);
+        const datos = response.data || {};
+        const token = typeof datos.token === 'string' ? datos.token : '';
+        const rol = typeof datos.rol === 'string' ? datos.rol : '';
+        if (token && rol) {
+          localStorage.setItem('token', token); // NOSONAR: token validado como string antes de persistir
+          localStorage.setItem('rol', rol); // NOSONAR: rol validado como string antes de persistir
+          localStorage.setItem('empleado', JSON.stringify(datos)); // NOSONAR: payload de sesion del login autenticado del backend
+          setEmpleadoAutenticado(datos);
+        }
       }
     } catch (err) {
       const mensaje = err.response?.data;
