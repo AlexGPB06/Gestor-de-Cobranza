@@ -40,7 +40,7 @@ const DIRECTORIO = [
   },
   {
     // Alta ya activada y luego dada de baja: es el unico caso que ofrece
-    // "Reactivar", porque un alta pendiente solo se puede eliminar.
+    // "Reactivar"; un alta pendiente solo permite cambiarle el rol.
     idEmpleado: 85,
     numeroEmpleado: 'S8OFF',
     nombreCompleto: 'Empleado De Baja',
@@ -82,13 +82,11 @@ describe('EmpleadosManager: carga del directorio', () => {
     expect(screen.getByText('Alta Pendiente')).toBeInTheDocument();
   });
 
-  it('filtra la consulta por la empresa recibida', async () => {
+  it('carga el directorio completo para que cualquier alta sea visible', async () => {
     render(<EmpleadosManager empresaId={2} />);
 
     await waitFor(() =>
-      expect(axios.get).toHaveBeenCalledWith('/api/empleados', {
-        params: { empresaId: 2 },
-      }),
+      expect(axios.get).toHaveBeenCalledWith('/api/empleados'),
     );
   });
 
@@ -261,7 +259,7 @@ describe('EmpleadosManager: alta de personal', () => {
   });
 });
 
-describe('EmpleadosManager: baja, reactivacion y borrado', () => {
+describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
   it('da de baja a un empleado activo tras confirmar', async () => {
     axios.post.mockResolvedValue({ data: { mensaje: 'Empleado dado de baja' } });
     const usuario = userEvent.setup();
@@ -307,28 +305,48 @@ describe('EmpleadosManager: baja, reactivacion y borrado', () => {
     );
   });
 
-  it('ofrece eliminar y no reactivar en un alta que nunca se activo', async () => {
+  it('en un alta pendiente solo se ofrece cambiar el rol', async () => {
     render(<EmpleadosManager empresaId={1} />);
 
     const fila = await screen.findByText('Alta Pendiente');
-    const boton = within(fila.closest('tr')).getByRole('button', { name: /eliminar alta/i });
+    const celda = fila.closest('tr');
 
-    expect(boton).toBeInTheDocument();
-    expect(within(fila.closest('tr')).queryByRole('button', { name: /reactivar/i })).toBeNull();
+    expect(within(celda).getByRole('button', { name: /cambiar rol/i })).toBeInTheDocument();
+    expect(within(celda).queryByRole('button', { name: /reactivar/i })).toBeNull();
+    expect(within(celda).queryByRole('button', { name: /eliminar/i })).toBeNull();
   });
 
-  it('elimina un alta pendiente y libera su numero', async () => {
-    axios.delete.mockResolvedValue({ data: { mensaje: 'Alta eliminada' } });
+  it('cambia el rol de un empleado tras confirmar', async () => {
+    axios.put.mockResolvedValue({ data: { mensaje: 'Rol actualizado a SUPERVISOR' } });
     const usuario = userEvent.setup();
     render(<EmpleadosManager empresaId={1} />);
 
-    const fila = await screen.findByText('Alta Pendiente');
-    await usuario.click(within(fila.closest('tr')).getByRole('button', { name: /eliminar/i }));
+    const fila = await screen.findByText('Verónica Castillo');
+    const celda = fila.closest('tr');
+    await usuario.click(within(celda).getByRole('button', { name: /cambiar rol/i }));
+    await usuario.selectOptions(within(celda).getByRole('combobox'), 'SUPERVISOR');
+    await usuario.click(within(celda).getByRole('button', { name: /guardar/i }));
 
     await waitFor(() =>
-      expect(axios.delete).toHaveBeenCalledWith('/api/empleados/S9NEW'),
+      expect(axios.put).toHaveBeenCalledWith('/api/empleados/S1G01/rol', {
+        rol: 'SUPERVISOR',
+      }),
     );
-    expect(await screen.findByText('Alta eliminada')).toBeInTheDocument();
+    expect(await screen.findByText('Rol actualizado a SUPERVISOR')).toBeInTheDocument();
+  });
+
+  it('muestra el error del backend al cambiar el rol', async () => {
+    axios.put.mockRejectedValue({ response: { data: 'No puedes modificar tu propio rol' } });
+    jest.spyOn(console, 'error').mockImplementation(() => {});
+    const usuario = userEvent.setup();
+    render(<EmpleadosManager empresaId={1} />);
+
+    const fila = await screen.findByText('Verónica Castillo');
+    const celda = fila.closest('tr');
+    await usuario.click(within(celda).getByRole('button', { name: /cambiar rol/i }));
+    await usuario.click(within(celda).getByRole('button', { name: /guardar/i }));
+
+    expect(await screen.findByText('No puedes modificar tu propio rol')).toBeInTheDocument();
   });
 
   it('muestra el error del backend al cambiar el estado', async () => {

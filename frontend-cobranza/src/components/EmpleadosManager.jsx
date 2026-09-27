@@ -22,10 +22,11 @@ export default function EmpleadosManager({ empresaId }) {
   const [codigoEmpresa, setCodigoEmpresa] = useState('');
   const [rolSeleccionado, setRolSeleccionado] = useState('GESTOR');
   const [supervisorSel, setSupervisorSel] = useState('');
+  const [editandoId, setEditandoId] = useState(null);
+  const [rolEdit, setRolEdit] = useState('');
 
   useEffect(() => {
     cargarDatos();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [empresaId]);
 
   useEffect(() => {
@@ -39,8 +40,7 @@ export default function EmpleadosManager({ empresaId }) {
 
   async function cargarDatos() {
     try {
-      const params = empresaId ? { params: { empresaId } } : {};
-      const resEmpleados = await axios.get('/api/empleados', params);
+      const resEmpleados = await axios.get('/api/empleados');
       setEmpleados(resEmpleados.data);
     } catch (error) {
       console.error("Error al cargar empleados:", error);
@@ -127,20 +127,21 @@ export default function EmpleadosManager({ empresaId }) {
     }
   };
 
-  const handleEliminar = async (empleado) => {
+  const handleCambiarRol = async (empleado) => {
     const ok = window.confirm(
-      `Se eliminará el alta de ${empleado.nombreCompleto} (${empleado.numeroEmpleado}) y el número quedará disponible. ¿Continuar?`
+      `¿Cambiar el rol de ${empleado.nombreCompleto} (${empleado.numeroEmpleado}) a ${rolEdit}?`
     );
     if (!ok) return;
 
     setNotificacion({ tipo: '', mensaje: '' });
     try {
-      const respuesta = await axios.delete(`/api/empleados/${empleado.numeroEmpleado}`);
-      setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Alta eliminada' });
+      const respuesta = await axios.put(`/api/empleados/${empleado.numeroEmpleado}/rol`, { rol: rolEdit });
+      setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Rol actualizado' });
+      setEditandoId(null);
       await cargarDatos();
     } catch (error) {
-      console.error("Error al eliminar el alta:", error);
-      setNotificacion({ tipo: 'error', mensaje: mensajeError(error, 'No se pudo eliminar el alta.') });
+      console.error("Error al cambiar el rol:", error);
+      setNotificacion({ tipo: 'error', mensaje: mensajeError(error, 'No se pudo cambiar el rol.') });
     }
   };
 
@@ -153,6 +154,7 @@ export default function EmpleadosManager({ empresaId }) {
       (emp.numeroEmpleado || '').toLowerCase().includes(t) ||
       (emp.nombreCompleto || '').toLowerCase().includes(t) ||
       (emp.usuario || '').toLowerCase().includes(t) ||
+      (emp.correoElectronico || '').toLowerCase().includes(t) ||
       (emp.rol || '').toLowerCase().includes(t)
     );
   })();
@@ -167,7 +169,7 @@ export default function EmpleadosManager({ empresaId }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Alta y Baja de Empleados</h2>
+        <h2 className="text-2xl font-bold text-slate-800">Alta, Baja y Roles de Empleados</h2>
         <p className="text-sm text-slate-500 mt-1">
           Registra al personal y entrégale su número de empleado. Con ese número él mismo crea su usuario y contraseña.
         </p>
@@ -329,27 +331,58 @@ export default function EmpleadosManager({ empresaId }) {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
-                          {emp.activo && !sinUsuario ? (
-                            <button
-                              onClick={() => handleCambioEstado(emp, false)}
-                              className="px-3 py-1 text-xs font-bold rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
-                            >
-                              Dar de baja
-                            </button>
-                          ) : sinUsuario ? (
-                            <button
-                              onClick={() => handleEliminar(emp)}
-                              className="px-3 py-1 text-xs font-bold rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
-                            >
-                              Eliminar alta
-                            </button>
+                          {editandoId === emp.idEmpleado ? (
+                            <div className="flex items-center justify-center gap-1">
+                              <select
+                                value={rolEdit}
+                                onChange={(e) => setRolEdit(e.target.value)}
+                                className="p-1 border border-slate-300 rounded text-xs bg-white"
+                              >
+                                {ROLES.map(r => (
+                                  <option key={r} value={r}>{r}</option>
+                                ))}
+                              </select>
+                              <button
+                                onClick={() => handleCambiarRol(emp)}
+                                className="px-2 py-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+                              >
+                                Guardar
+                              </button>
+                              <button
+                                onClick={() => setEditandoId(null)}
+                                className="px-2 py-1 text-xs font-bold rounded bg-slate-100 text-slate-600 hover:bg-slate-200 transition-colors"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
                           ) : (
-                            <button
-                              onClick={() => handleCambioEstado(emp, true)}
-                              className="px-3 py-1 text-xs font-bold rounded bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
-                            >
-                              Reactivar
-                            </button>
+                            <div className="flex items-center justify-center gap-1 flex-wrap">
+                              {emp.activo && !sinUsuario && (
+                                <button
+                                  onClick={() => handleCambioEstado(emp, false)}
+                                  className="px-3 py-1 text-xs font-bold rounded bg-red-50 text-red-700 hover:bg-red-100 transition-colors"
+                                >
+                                  Dar de baja
+                                </button>
+                              )}
+                              {!emp.activo && !sinUsuario && (
+                                <button
+                                  onClick={() => handleCambioEstado(emp, true)}
+                                  className="px-3 py-1 text-xs font-bold rounded bg-green-50 text-green-700 hover:bg-green-100 transition-colors"
+                                >
+                                  Reactivar
+                                </button>
+                              )}
+                              <button
+                                onClick={() => {
+                                  setEditandoId(emp.idEmpleado);
+                                  setRolEdit(emp.rol || 'GESTOR');
+                                }}
+                                className="px-3 py-1 text-xs font-bold rounded bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
+                              >
+                                Cambiar rol
+                              </button>
+                            </div>
                           )}
                         </td>
                       </tr>

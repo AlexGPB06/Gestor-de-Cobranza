@@ -1,12 +1,10 @@
 package com.cobranza.saas_cobranza;
 
 import com.cobranza.saas_cobranza.controller.EmpleadoController;
-import com.cobranza.saas_cobranza.repository.AsignacionCarteraRepository;
 import com.cobranza.saas_cobranza.repository.CampanaRepository;
 import com.cobranza.saas_cobranza.repository.DepartamentoRepository;
 import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
 import com.cobranza.saas_cobranza.repository.EmpresaRepository;
-import com.cobranza.saas_cobranza.repository.GestionRepository;
 import com.cobranza.saas_cobranza.repository.RolCampanaRepository;
 import com.cobranza.saas_cobranza.util.JwtUtil;
 import com.cobranza.saas_cobranza.util.PasswordUtil;
@@ -26,7 +24,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class EmpleadoControllerTest {
@@ -49,15 +46,8 @@ class EmpleadoControllerTest {
     @Mock
     private RolCampanaRepository rolCampanaRepository;
 
-    @Mock
-    private GestionRepository gestionRepository;
-
-    @Mock
-    private AsignacionCarteraRepository asignacionCarteraRepository;
-
     private Empleado empleadoMock;
     private Empleado empleadoGestorMock;
-    private Empleado empleadoPendienteMock;
 
     @BeforeEach
     void setUp() {
@@ -82,15 +72,6 @@ class EmpleadoControllerTest {
         empleadoGestorMock.setRol("GESTOR");
         empleadoGestorMock.setContrasenaHash(PasswordUtil.hash("Clave#2026e"));
         empleadoGestorMock.setActivo(true);
-
-        empleadoPendienteMock = new Empleado();
-        empleadoPendienteMock.setIdEmpleado(238L);
-        empleadoPendienteMock.setNumeroEmpleado("S1G09");
-        empleadoPendienteMock.setUsuario(null);
-        empleadoPendienteMock.setNombreCompleto("Sofia Mora Delgado");
-        empleadoPendienteMock.setCorreoElectronico("gestor.s1.09@santander.mx");
-        empleadoPendienteMock.setRol("GESTOR");
-        empleadoPendienteMock.setActivo(false);
     }
 
     @Test
@@ -356,24 +337,104 @@ class EmpleadoControllerTest {
     }
 
     @Test
-    void eliminar_EmpleadoYaRegistrado_DeberiaRetornar400() {
-        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+    void cambiarRol_RolValido_DeberiaActualizarRol() {
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "SUPERVISOR");
 
-        ResponseEntity<?> response = empleadoController.eliminar(tokenAdmin(), "S1G01");
+        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+        when(empleadoRepository.save(any(Empleado.class))).thenAnswer(inv -> inv.getArgument(0));
+        when(rolCampanaRepository.findAll()).thenReturn(List.of());
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(tokenAdmin(), "S1G01", datos);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals("SUPERVISOR", empleadoGestorMock.getRol());
+        assertTrue(response.getBody() instanceof Map);
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertEquals("S1G01", body.get("numeroEmpleado"));
+        assertEquals("SUPERVISOR", body.get("rol"));
+    }
+
+    @Test
+    void cambiarRol_SinToken_DeberiaRetornar401() {
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "GESTOR");
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(null, "S1G01", datos);
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarRol_Gestor_DeberiaRetornar403() {
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "SUPERVISOR");
+
+        String tokenGestor = JwtUtil.generarToken("2", "GESTOR", "gestor.s1.01", "S1G01");
+
+        ResponseEntity<?> response = empleadoController.cambiarRol("Bearer " + tokenGestor, "S1G01", datos);
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarRol_RolNoValido_DeberiaRetornar400() {
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "DIRECTOR");
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(tokenAdmin(), "S1G01", datos);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
     }
 
     @Test
-    void eliminar_AltaPendiente_DeberiaRetornar200() {
-        when(empleadoRepository.findByNumeroEmpleado("S1G09")).thenReturn(Optional.of(empleadoPendienteMock));
-        when(empleadoRepository.findAll()).thenReturn(List.of(empleadoPendienteMock));
-        when(rolCampanaRepository.findAll()).thenReturn(List.of());
+    void cambiarRol_SobreSiMismo_DeberiaRetornar400() {
+        Empleado yo = new Empleado();
+        yo.setIdEmpleado(1L);
+        yo.setNumeroEmpleado("A1X2B");
+        yo.setRol("ADMINISTRADOR");
+        yo.setActivo(true);
 
-        ResponseEntity<?> response = empleadoController.eliminar(tokenAdmin(), "S1G09");
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "GESTOR");
 
-        assertEquals(HttpStatus.OK, response.getStatusCode());
-        verify(empleadoRepository).delete(empleadoPendienteMock);
+        when(empleadoRepository.findByNumeroEmpleado("A1X2B")).thenReturn(Optional.of(yo));
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(tokenAdmin(), "A1X2B", datos);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarRol_UnicoAdministradorActivo_DeberiaRetornar400() {
+        Empleado unicoAdmin = new Empleado();
+        unicoAdmin.setIdEmpleado(7L);
+        unicoAdmin.setNumeroEmpleado("A9Z8Y");
+        unicoAdmin.setNombreCompleto("Único Admin");
+        unicoAdmin.setRol("ADMINISTRADOR");
+        unicoAdmin.setActivo(true);
+
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "GESTOR");
+
+        when(empleadoRepository.findByNumeroEmpleado("A9Z8Y")).thenReturn(Optional.of(unicoAdmin));
+        when(empleadoRepository.findAll()).thenReturn(List.of(unicoAdmin));
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(tokenAdmin(), "A9Z8Y", datos);
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarRol_NumeroInexistente_DeberiaRetornar404() {
+        Map<String, String> datos = new HashMap<>();
+        datos.put("rol", "GESTOR");
+
+        when(empleadoRepository.findByNumeroEmpleado("ZZZZZ")).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = empleadoController.cambiarRol(tokenAdmin(), "ZZZZZ", datos);
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 
     private String tokenAdmin() {

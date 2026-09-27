@@ -15,8 +15,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Component
 @ConditionalOnProperty(name = "saas.cobranza.semillas", havingValue = "true")
@@ -62,14 +60,17 @@ public class DataSeeder implements CommandLineRunner {
     @Transactional
     public void run(String... args) {
         semillasEmpresas();
+        semillasCampanas();
         semillasTiposPromesa();
         semillasDepartamentos();
+        semillasAdmin();
         asignarCobranzaAEmpleados();
         semillasPersonalOperativo();
         semillasSupervisoresYEquipos();
         semillasTiposTicket();
         desactivarConceptosPromocionesConvenio();
-        semillasCarterasSupervisadas();
+        semillasTiposProducto();
+        semillasClientesDemo();
         semillasRoles();
     }
 
@@ -90,6 +91,120 @@ public class DataSeeder implements CommandLineRunner {
             empresa.setActivo(true);
             empresaRepository.save(empresa);
         }
+    }
+
+    private void semillasCampanas() {
+        for (Empresa empresa : empresaRepository.findAll()) {
+            if (!campanaRepository.findByEmpresa_IdEmpresa(empresa.getIdEmpresa()).isEmpty()) {
+                continue;
+            }
+            Campana campana = new Campana();
+            campana.setEmpresa(empresa);
+            campana.setNombreEmpresa(empresa.getNombre() + " - Cobranza");
+            campana.setDiasMaximosPromesa(5);
+            campana.setActivo(true);
+            campanaRepository.save(campana);
+        }
+    }
+
+    private void semillasTiposProducto() {
+        List<TipoProducto> existentes = tipoProductoRepository.findAll();
+        for (Campana campana : campanaRepository.findAll()) {
+            boolean yaExiste = existentes.stream().anyMatch(p ->
+                    p.getCampana() != null && p.getCampana().getIdCampana().equals(campana.getIdCampana())
+                            && esProductoTDC(p.getNombreProducto()));
+            if (yaExiste) {
+                continue;
+            }
+            TipoProducto producto = new TipoProducto();
+            producto.setCampana(campana);
+            producto.setNombreProducto("Tarjeta de Crédito");
+            producto.setTasaInteres(new BigDecimal("42.00"));
+            producto.setActivo(true);
+            tipoProductoRepository.save(producto);
+        }
+    }
+
+    private void semillasClientesDemo() {
+        Empleado gestor = empleadoRepository.findByUsuario("gestor.s1.01").orElse(null);
+        if (gestor == null || gestor.getEmpresa() == null) {
+            return;
+        }
+        Campana campana = campanaRepository.findByEmpresa_IdEmpresa(gestor.getEmpresa().getIdEmpresa())
+                .stream().findFirst().orElse(null);
+        if (campana == null) {
+            return;
+        }
+        TipoProducto tdc = elegirTipoProductoTDC(campana);
+
+        String[] nombres = {
+                "Ana Luisa Robles", "Carlos Mendoza Ruiz", "Patricia Herrera", "Jorge Delgado Cruz",
+                "Mariana Solís Vega", "Héctor Iván Palacios", "Fernanda Cortés Nava", "Rodrigo Amaya León",
+                "Silvia Elena Fuentes", "Omar Bustos Paredes"
+        };
+
+        for (int i = 1; i <= 10; i++) {
+            String numeroCuenta = String.format("TDC-DEMO-%03d", i);
+            if (deudaRepository.existsByNumeroCuenta(numeroCuenta)) {
+                continue;
+            }
+
+            Deudor deudor = new Deudor();
+            deudor.setCampana(campana);
+            deudor.setNombreCompleto(nombres[i - 1]);
+            deudor.setDocumentoIdentidad(String.format("RFC-DEMO-%03d", i));
+            deudor.setTelefonoPrincipal("55" + String.format("%08d", 40000000 + i));
+            deudor.setCorreoElectronico(String.format("cliente.demo.%03d@correo.com", i));
+            deudor = deudorRepository.save(deudor);
+
+            Deuda deuda = new Deuda();
+            deuda.setDeudor(deudor);
+            deuda.setTipoProducto(tdc);
+            deuda.setNumeroCuenta(numeroCuenta);
+            BigDecimal original = new BigDecimal(15000 + (i * 2500));
+            deuda.setMontoOriginal(original);
+            deuda.setSaldoPendiente(original.multiply(new BigDecimal("0.75")));
+            deuda.setFechaVencimiento(LocalDate.now().minusMonths(1 + (i % 6)).withDayOfMonth(1));
+            deuda.setEstado("PENDIENTE");
+            deuda = deudaRepository.save(deuda);
+
+            AsignacionCartera asignacion = new AsignacionCartera();
+            asignacion.setDeuda(deuda);
+            asignacion.setEmpleado(gestor);
+            asignacion.setFechaAsignacion(LocalDate.now());
+            asignacion.setEstatusActiva(true);
+            asignacionCarteraRepository.save(asignacion);
+        }
+    }
+
+    private void semillasAdmin() {
+        if (empleadoRepository.existsByUsuario("admin") || empleadoRepository.existsByNumeroEmpleado("ADM01")) {
+            return;
+        }
+        Empresa empresa = empresaRepository.findById(1L).orElse(null);
+        if (empresa == null) {
+            return;
+        }
+        List<Departamento> deptos = departamentoRepository.findByEmpresa_IdEmpresa(empresa.getIdEmpresa());
+        Departamento depto = deptos.stream()
+                .filter(d -> d.getNombre().equalsIgnoreCase("Cobranza"))
+                .findFirst()
+                .orElse(deptos.stream().findFirst().orElse(null));
+        if (depto == null) {
+            return;
+        }
+        Empleado admin = new Empleado();
+        admin.setNumeroEmpleado("ADM01");
+        admin.setNombreCompleto("Administrador General");
+        admin.setUsuario("admin");
+        admin.setCorreoElectronico("admin@sistema.mx");
+        admin.setRol("ADMINISTRADOR");
+        admin.setActivo(true);
+        admin.setContrasenaHash(PasswordUtil.hash("Operativo123"));
+        admin.setFechaCreacion(LocalDateTime.now());
+        admin.setDepartamento(depto);
+        admin.setEmpresa(empresa);
+        empleadoRepository.save(admin);
     }
 
     private void semillasTiposPromesa() {
@@ -390,116 +505,25 @@ public class DataSeeder implements CommandLineRunner {
         return nombres[(s * 10 + g) % 10] + " " + apellidos[(s * 3 + g) % 10] + " " + apellidos[(g * 2) % 10];
     }
 
-    private void semillasCarterasSupervisadas() {
-        List<Empleado> gestores = empleadoRepository.findByEmpresa_IdEmpresa(1L).stream()
-                .filter(e -> e.getRol() != null && e.getRol().equalsIgnoreCase("GESTOR")
-                        && e.getNumeroEmpleado() != null && e.getNumeroEmpleado().matches("S\\dG\\d\\d"))
-                .toList();
-        if (gestores.isEmpty()) {
-            return;
-        }
-
-        limpiarProductosMixtos();
-
-        int contador = 1;
-        for (Empleado gestor : gestores) {
-            for (int k = 1; k <= 105; k++) {
-                contador = crearCuentaTDC(gestor.getEmpresa(), gestor.getNumeroEmpleado(), k, contador, gestor);
-            }
-        }
-
-        // Asegurar que NO queden cuentas sin asignar: todo se reparte a los gestores del equipo.
-        List<Deuda> todas = deudaRepository.findByDeudor_Campana_Empresa_IdEmpresa(gestores.get(0).getEmpresa().getIdEmpresa());
-        Set<Long> activas = asignacionCarteraRepository.findByDeuda_Deudor_Campana_Empresa_IdEmpresa(gestores.get(0).getEmpresa().getIdEmpresa()).stream()
-                .filter(a -> Boolean.TRUE.equals(a.getEstatusActiva()))
-                .map(a -> a.getDeuda().getIdDeuda())
-                .collect(Collectors.toSet());
-        int idx = 0;
-        for (Deuda deuda : todas) {
-            if (activas.contains(deuda.getIdDeuda())) {
-                continue;
-            }
-            Empleado gestor = gestores.get(idx % gestores.size());
-            AsignacionCartera asignacion = new AsignacionCartera();
-            asignacion.setDeuda(deuda);
-            asignacion.setEmpleado(gestor);
-            asignacion.setFechaAsignacion(LocalDate.now());
-            asignacion.setEstatusActiva(true);
-            asignacionCarteraRepository.save(asignacion);
-            idx++;
-        }
-    }
-
-    private void limpiarProductosMixtos() {
-        List<Deuda> todas = deudaRepository.findByDeudor_Campana_Empresa_IdEmpresa(1L);
-        for (Deuda d : todas) {
-            String n = d.getNumeroCuenta();
-            if (n != null && n.matches("(AUT|HIP|PER)-(S\\dG\\d\\d|POOL)-.*")) {
-                asignacionCarteraRepository.deleteAll(
-                        asignacionCarteraRepository.findByDeuda_IdDeudaAndEstatusActivaTrue(d.getIdDeuda()));
-                deudaRepository.delete(d);
-            }
-        }
-    }
-
-    private int crearCuentaTDC(Empresa empresa, String prefijo, int k, int contador, Empleado gestor) {
-        if (empresa == null) {
-            return contador;
-        }
-        String numeroCuenta = String.format("TDC-%s-%03d", prefijo, k);
-        if (deudaRepository.existsByNumeroCuenta(numeroCuenta)) {
-            return contador + 1;
-        }
-        Campana campana = campanaRepository.findByEmpresa_IdEmpresa(empresa.getIdEmpresa()).stream().findFirst().orElse(null);
-        if (campana == null) {
-            return contador + 1;
-        }
-
-        TipoProducto tipoProducto = elegirTipoProductoTDC(campana);
-
-        Deudor deudor = new Deudor();
-        String[] nombres = {"Alberto", "Gabriela", "José", "Mónica", "Raúl", "Leticia", "Eduardo", "Silvia", "Hugo", "Patricia", "Andrés", "Claudia", "Iván", "Marisol", "Tobías", "Nadia", "René", "Yolanda", "Saúl", "Rocío"};
-        String[] apellidos = {"Hernández", "García", "Martínez", "López", "González", "Pérez", "Rodríguez", "Sánchez", "Ramírez", "Cruz", "Flores", "Gómez", "Díaz", "Reyes", "Morales", "Ortiz", "Jiménez", "Vázquez", "Ruiz", "Chávez"};
-        deudor.setCampana(campana);
-        deudor.setNombreCompleto(nombres[contador % 20] + " " + apellidos[contador % 20] + " " + apellidos[(contador * 2) % 20]);
-        deudor.setDocumentoIdentidad(String.format("RFC-TDC-%s-%03d", prefijo, k));
-        deudor.setTelefonoPrincipal("55" + String.format("%08d", 10000000 + contador));
-        deudor.setCorreoElectronico(String.format("cliente.%s.%03d@correo.com", prefijo, k));
-        deudor = deudorRepository.save(deudor);
-
-        Deuda deuda = new Deuda();
-        deuda.setDeudor(deudor);
-        deuda.setTipoProducto(tipoProducto);
-        deuda.setNumeroCuenta(numeroCuenta);
-        BigDecimal original = new BigDecimal(20000 + (contador % 120000));
-        deuda.setMontoOriginal(original);
-        BigDecimal saldo = original.multiply(new BigDecimal("0.85"));
-        deuda.setSaldoPendiente(saldo);
-        deuda.setFechaVencimiento(LocalDate.now().minusMonths(1 + (contador % 6)));
-        deuda.setEstado("PENDIENTE");
-        deuda = deudaRepository.save(deuda);
-
-        AsignacionCartera asignacion = new AsignacionCartera();
-        asignacion.setDeuda(deuda);
-        asignacion.setEmpleado(gestor);
-        asignacion.setFechaAsignacion(LocalDate.now());
-        asignacion.setEstatusActiva(true);
-        asignacionCarteraRepository.save(asignacion);
-        return contador + 1;
-    }
-
     private TipoProducto elegirTipoProductoTDC(Campana campana) {
         List<TipoProducto> productos = tipoProductoRepository.findByCampana_Empresa_IdEmpresa(campana.getEmpresa().getIdEmpresa());
         if (productos.isEmpty()) {
             return null;
         }
         for (TipoProducto p : productos) {
-            String n = p.getNombreProducto() == null ? "" : p.getNombreProducto().toLowerCase();
-            if (n.contains("tarjeta") || n.contains("tdc") || n.contains("crédito") || n.contains("credito")) {
+            if (esProductoTDC(p.getNombreProducto())) {
                 return p;
             }
         }
         return productos.get(0);
+    }
+
+    private boolean esProductoTDC(String nombre) {
+        if (nombre == null) {
+            return false;
+        }
+        String n = nombre.toLowerCase();
+        return n.contains("tarjeta") || n.contains("tdc") || n.contains("crédito") || n.contains("credito");
     }
 
 }

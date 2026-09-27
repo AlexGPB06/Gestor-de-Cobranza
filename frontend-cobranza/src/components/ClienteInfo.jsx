@@ -15,6 +15,13 @@ const mesesDeMora = (fechaVencimiento) => {
   return meses;
 };
 
+const estaVencida = (fechaVencimiento) => {
+  if (!fechaVencimiento) return false;
+  const venc = new Date(fechaVencimiento + 'T00:00:00');
+  if (Number.isNaN(venc.getTime())) return false;
+  return venc <= new Date();
+};
+
 export default function ClienteInfo({ deudor, deudas }) {
   const deudasDelDeudor = deudas.filter(d => d.deudor?.idDeudor === deudor.idDeudor || d.idDeudor === deudor.idDeudor);
   const telefonos = deudor.telefonos && deudor.telefonos.length > 0
@@ -81,7 +88,9 @@ export default function ClienteInfo({ deudor, deudas }) {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {deudasDelDeudor.map(deuda => {
-              const moraMeses = mesesDeMora(deuda.fechaVencimiento);
+              const moraCalculada = mesesDeMora(deuda.fechaVencimiento);
+              const enMora = deuda.saldoPendiente > 0 && estaVencida(deuda.fechaVencimiento);
+              const moraMeses = enMora ? Math.max(1, moraCalculada) : moraCalculada;
               return (
                 <div key={deuda.idDeuda} className="bg-white rounded-xl border border-slate-200 shadow-sm p-5 flex flex-col gap-3">
                   <div className="flex justify-between items-start">

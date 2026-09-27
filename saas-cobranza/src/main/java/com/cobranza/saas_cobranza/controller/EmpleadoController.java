@@ -5,12 +5,10 @@ import com.cobranza.saas_cobranza.Departamento;
 import com.cobranza.saas_cobranza.Empleado;
 import com.cobranza.saas_cobranza.Empresa;
 import com.cobranza.saas_cobranza.RolCampana;
-import com.cobranza.saas_cobranza.repository.AsignacionCarteraRepository;
 import com.cobranza.saas_cobranza.repository.CampanaRepository;
 import com.cobranza.saas_cobranza.repository.DepartamentoRepository;
 import com.cobranza.saas_cobranza.repository.EmpleadoRepository;
 import com.cobranza.saas_cobranza.repository.EmpresaRepository;
-import com.cobranza.saas_cobranza.repository.GestionRepository;
 import com.cobranza.saas_cobranza.repository.RolCampanaRepository;
 import com.cobranza.saas_cobranza.util.JwtUtil;
 import com.cobranza.saas_cobranza.util.PasswordUtil;
@@ -53,12 +51,6 @@ public class EmpleadoController {
 
     @Autowired
     private RolCampanaRepository rolCampanaRepository;
-
-    @Autowired
-    private GestionRepository gestionRepository;
-
-    @Autowired
-    private AsignacionCarteraRepository asignacionCarteraRepository;
 
     @GetMapping
     public ResponseEntity<?> listar(@RequestHeader(value = "Authorization", required = false) String authorization,
@@ -248,9 +240,10 @@ public class EmpleadoController {
         return ResponseEntity.ok(respuesta);
     }
 
-    @DeleteMapping("/{numeroEmpleado}")
-    public ResponseEntity<?> eliminar(@RequestHeader(value = "Authorization", required = false) String authorization,
-                                      @PathVariable String numeroEmpleado) {
+    @PutMapping("/{numeroEmpleado}/rol")
+    public ResponseEntity<?> cambiarRol(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                        @PathVariable String numeroEmpleado,
+                                        @RequestBody Map<String, String> datos) {
 
         JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
         if (sesion == null) {
@@ -258,11 +251,22 @@ public class EmpleadoController {
         }
         if (!sesion.tieneRol(ROL_ADMIN)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body("Solo el administrador puede eliminar empleados");
+                    .body("Solo el administrador puede modificar el rol de los empleados");
         }
 
         if (numeroEmpleado == null || !CODIGO_EMPLEADO.matcher(numeroEmpleado).matches()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El número de empleado debe ser de exactamente 5 caracteres alfanuméricos");
+        }
+
+        String rol = value(datos, "rol");
+        if (rol == null || rol.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El rol es obligatorio y debe ser uno de: " + String.join(", ", ROLES_VALIDOS));
+        }
+        String rolNormalizado = rol.trim().toUpperCase();
+        if (!ROLES_VALIDOS.contains(rolNormalizado)) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El rol no es válido. Usa uno de: " + String.join(", ", ROLES_VALIDOS));
         }
 
         String codigo = numeroEmpleado.toUpperCase();
@@ -273,44 +277,40 @@ public class EmpleadoController {
         Empleado empleado = empleadoOpt.get();
 
         if (sesion.numeroEmpleado() != null && sesion.numeroEmpleado().equalsIgnoreCase(codigo)) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("No puedes eliminar tu propia cuenta");
-        }
-        if (empleado.getUsuario() != null && !empleado.getUsuario().isBlank()) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Este empleado ya creó su usuario, no se puede eliminar. Usa 'Dar de baja'.");
+                    .body("No puedes modificar tu propio rol");
         }
 
-        boolean tieneGestiones = gestionRepository.findAll().stream()
-                .anyMatch(g -> g.getEmpleado() != null
-                        && g.getEmpleado().getIdEmpleado().equals(empleado.getIdEmpleado()));
-        if (tieneGestiones) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Este empleado ya tiene gestiones registradas, no se puede eliminar");
-        }
-        boolean tieneCartera = asignacionCarteraRepository.findAll().stream()
-                .anyMatch(a -> a.getEmpleado() != null
-                        && a.getEmpleado().getIdEmpleado().equals(empleado.getIdEmpleado()));
-        if (tieneCartera) {
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                    .body("Este empleado tiene cartera asignada, no se puede eliminar");
+        boolean eraAdmin = ROL_ADMIN.equalsIgnoreCase(empleado.getRol());
+        if (eraAdmin && !ROL_ADMIN.equals(rolNormalizado)) {
+            long otrosAdministradores = empleadoRepository.findAll().stream()
+                    .filter(e -> ROL_ADMIN.equalsIgnoreCase(e.getRol()))
+                    .filter(e -> !codigo.equalsIgnoreCase(e.getNumeroEmpleado()))
+                    .filter(e -> Boolean.TRUE.equals(e.getActivo()))
+                    .count();
+            if (otrosAdministradores == 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body("No puedes quitar el rol al único administrador activo");
+            }
         }
 
-        empleadoRepository.findAll().stream()
-                .filter(e -> e.getSupervisor() != null
-                        && e.getSupervisor().getIdEmpleado().equals(empleado.getIdEmpleado()))
-                .forEach(e -> {
-                    e.setSupervisor(null);
-                    empleadoRepository.save(e);
+        empleado.setRol(rolNormalizado);
+        Empleado actualizado = empleadoRepository.save(empleado);
+
+        rolCampanaRepository.findAll().stream()
+                .filter(rc -> rc.getEmpleado() != null
+                        && rc.getEmpleado().getIdEmpleado().equals(actualizado.getIdEmpleado()))
+                .forEach(rc -> {
+                    rc.setRol(rolNormalizado);
+                    rolCampanaRepository.save(rc);
                 });
-
-        rolCampanaRepository.deleteAll(rolCampanaRepository.findAll().stream()
-                .filter(rc -> rc.getEmpleado().getIdEmpleado().equals(empleado.getIdEmpleado()))
-                .toList());
-
-        empleadoRepository.delete(empleado);
+        asignarRolEnCampana(actualizado, rolNormalizado);
 
         Map<String, Object> respuesta = new HashMap<>();
-        respuesta.put("mensaje", "Alta eliminada, el número " + codigo + " quedó disponible");
+        respuesta.put("mensaje", "Rol actualizado a " + rolNormalizado);
+        respuesta.put("numeroEmpleado", actualizado.getNumeroEmpleado());
+        respuesta.put("nombre", actualizado.getNombreCompleto());
+        respuesta.put("rol", actualizado.getRol());
         return ResponseEntity.ok(respuesta);
     }
 
