@@ -60,6 +60,33 @@ docker compose down               # apagar (los datos persisten en el volumen)
 | `gestor.s1.01` | `Operativo123` | Gestor |
 | `supervisor.s1` | `Operativo123` | Supervisor |
 
+## Clientes demo (cartera del gestor)
+
+Al arrancar con semillas se siembran **10 clientes en mora**, ya asignados a la cartera de `gestor.s1.01`. Entra con ese usuario y abre el menú **👥 Mi Cartera** para visualizarlos; también se buscan por número de cuenta en **🗂️ Info/Gestión** (ej. `TDC-DEMO-001`).
+
+| Cuenta | RFC | Cliente | Correo | Teléfono | Saldo pendiente |
+|---|---|---|---|---|---|
+| `TDC-DEMO-001` | `RFC-DEMO-001` | Ana Luisa Robles | cliente.demo.001@correo.com | 5540000001 | $13,125.00 |
+| `TDC-DEMO-002` | `RFC-DEMO-002` | Carlos Mendoza Ruiz | cliente.demo.002@correo.com | 5540000002 | $15,000.00 |
+| `TDC-DEMO-003` | `RFC-DEMO-003` | Patricia Herrera | cliente.demo.003@correo.com | 5540000003 | $16,875.00 |
+| `TDC-DEMO-004` | `RFC-DEMO-004` | Jorge Delgado Cruz | cliente.demo.004@correo.com | 5540000004 | $18,750.00 |
+| `TDC-DEMO-005` | `RFC-DEMO-005` | Mariana Solís Vega | cliente.demo.005@correo.com | 5540000005 | $20,625.00 |
+| `TDC-DEMO-006` | `RFC-DEMO-006` | Héctor Iván Palacios | cliente.demo.006@correo.com | 5540000006 | $22,500.00 |
+| `TDC-DEMO-007` | `RFC-DEMO-007` | Fernanda Cortés Nava | cliente.demo.007@correo.com | 5540000007 | $24,375.00 |
+| `TDC-DEMO-008` | `RFC-DEMO-008` | Rodrigo Amaya León | cliente.demo.008@correo.com | 5540000008 | $26,250.00 |
+| `TDC-DEMO-009` | `RFC-DEMO-009` | Silvia Elena Fuentes | cliente.demo.009@correo.com | 5540000009 | $28,125.00 |
+| `TDC-DEMO-010` | `RFC-DEMO-010` | Omar Bustos Paredes | cliente.demo.010@correo.com | 5540000010 | $30,000.00 |
+
+## Alta de usuarios (admin)
+
+1. Entra como `admin` → menú **👥 Gestión de Empleados** → sección **Alta de Personal**.
+2. Llena el formulario: **Nombre Completo**\*, **Correo Electrónico**\*, **Número de Empleado**\* (exactamente 5 caracteres alfanuméricos, ej. `S1G02`), **Empresa de Pertenencia**, **Rol en el Sistema**\* (`ADMIN`, `SUPERVISOR`, `GESTOR` o `USUARIO`) y **Supervisor** (opcional, número de empleado).
+3. Pulsa **Registrar Empleado** (`POST /api/empleados`). La cuenta queda **inactiva**, todavía sin usuario ni contraseña, y el sistema devuelve el número de empleado: entrégaselo a la persona.
+4. El nuevo usuario abre la pantalla de login y selecciona la pestaña **Primer Ingreso** (`POST /api/empleados/activar`): ingresa su **código de empleado**, el **usuario** que desee y una **contraseña de 8 o más caracteres**, y pulsa **Activar mi Cuenta**.
+5. Listo: ya puede iniciar sesión con ese usuario y contraseña.
+
+> En la misma vista el admin puede dar de baja, cambiar el rol o reasignar la campaña de un empleado existente.
+
 ## Desarrollo local (sin Docker)
 
 **1. MySQL** (si no tienes uno corriendo en el puerto 3306):
