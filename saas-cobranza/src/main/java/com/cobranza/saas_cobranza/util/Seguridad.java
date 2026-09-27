@@ -25,8 +25,6 @@ public final class Seguridad {
     public static final String MENSAJE_SIN_TOKEN = "Token ausente o inválido";
     public static final String MENSAJE_NO_GESTOR =
             "Acceso exclusivo del gestor. El administrador y el supervisor no gestionan la cobranza.";
-    public static final String MENSAJE_NO_ADMIN =
-            "Acceso exclusivo del administrador.";
     public static final String MENSAJE_NO_SUPERVISOR =
             "Acceso exclusivo del supervisor a su propio equipo.";
 
@@ -60,17 +58,6 @@ public final class Seguridad {
         }
         if (!esGestor(sesion)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body(MENSAJE_NO_GESTOR);
-        }
-        return null;
-    }
-
-    public static ResponseEntity<?> soloAdmin(String authorization) {
-        JwtUtil.Sesion sesion = sesion(authorization);
-        if (sesion == null) {
-            return sinToken();
-        }
-        if (!esAdmin(sesion)) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(MENSAJE_NO_ADMIN);
         }
         return null;
     }

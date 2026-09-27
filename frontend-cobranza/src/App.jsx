@@ -4,10 +4,6 @@ import InfoGestion from './components/InfoGestion';
 import CarteraGestor from './components/CarteraGestor';
 import MiMeta from './components/MiMeta';
 import MiMetaEquipo from './components/MiMetaEquipo';
-import CampanaList from './components/CampanaList';
-import CatalogosManager from './components/CatalogosManager';
-import AuditoriaViewer from './components/AuditoriaViewer';
-import AsignacionCartera from './components/AsignacionCartera';
 import EmpleadosManager from './components/EmpleadosManager';
 import SupervisionPanel from './components/SupervisionPanel';
 import AsignacionSupervisor from './components/AsignacionSupervisor';
@@ -47,7 +43,6 @@ function App() {
   const [nuevaContrasena, setNuevaContrasena] = useState('');
 
   // --- ESTADOS DE DATOS ---
-  const [campanas, setCampanas] = useState([]);
   const [deudores, setDeudores] = useState([]);
   const [deudas, setDeudas] = useState([]);
   const [gestiones, setGestiones] = useState([]);
@@ -90,9 +85,8 @@ function App() {
   useEffect(() => {
     if (empleadoAutenticado) {
       const params = { params: { empresaId: empleadoAutenticado.idEmpresa } };
-      axios.get('/api/campanas', params).then(res => setCampanas(res.data)).catch(console.error);
-      axios.get('/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
       if (esGestor) {
+        axios.get('/api/conceptos', params).then(res => setConceptos(res.data)).catch(console.error);
         axios.get('/api/deudores', params).then(res => setDeudores(res.data)).catch(console.error);
         axios.get('/api/deudas', params).then(res => setDeudas(res.data)).catch(console.error);
         axios.get('/api/motivos-no-pago', params).then(res => setMotivos(res.data)).catch(console.error);
@@ -310,11 +304,7 @@ function App() {
           {seccionesPermitidas(empleadoAutenticado.rol).includes('administracion') && (
             <div className="pt-4 mt-4 border-t border-slate-800">
               <p className="px-4 text-[10px] text-slate-500 uppercase tracking-wider mb-2 font-bold">Administración</p>
-              <button onClick={() => setVistaActual('empleados')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'empleados' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Alta / Baja de Empleados</button>
-              <button onClick={() => setVistaActual('asignacion')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'asignacion' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🗂️ Asignar Cartera</button>
-              <button onClick={() => setVistaActual('catalogos')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'catalogos' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>⚙️ Catálogos Operativos</button>
-              <button onClick={() => setVistaActual('auditoria')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'auditoria' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🛡️ Bitácora de Auditoría</button>
-              <button onClick={() => setVistaActual('campanas')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'campanas' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>🏢 Campañas Activas</button>
+              <button onClick={() => setVistaActual('empleados')} className={`w-full flex items-center px-4 py-3 rounded-lg font-semibold transition-colors ${vistaActual === 'empleados' ? 'bg-blue-600 text-white' : 'hover:bg-slate-800 hover:text-white'}`}>👥 Gestión de Empleados</button>
             </div>
           )}
 
@@ -385,11 +375,7 @@ function App() {
             />
           )}
           {vistaActual === 'metaEquipo' && esSupervisor(empleadoAutenticado.rol) && <MiMetaEquipo supervisorId={empleadoAutenticado.idEmpleado} />}
-          {vistaActual === 'campanas' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><CampanaList campanas={campanas} /></div>}
           {vistaActual === 'empleados' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><EmpleadosManager empresaId={empleadoAutenticado.idEmpresa} /></div>}
-          {vistaActual === 'asignacion' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><AsignacionCartera empresaId={empleadoAutenticado.idEmpresa} /></div>}
-          {vistaActual === 'catalogos' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><CatalogosManager /></div>}
-          {vistaActual === 'auditoria' && esAdministrador(empleadoAutenticado.rol) && <div className="animate-fade-in"><AuditoriaViewer /></div>}
           {vistaActual === 'supervision' && esSupervisor(empleadoAutenticado.rol) && <SupervisionPanel supervisorId={empleadoAutenticado.idEmpleado} />}
           {vistaActual === 'asignacionSup' && esSupervisor(empleadoAutenticado.rol) && <AsignacionSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}
           {vistaActual === 'promesasSup' && esSupervisor(empleadoAutenticado.rol) && <PromesasSupervisor supervisorId={empleadoAutenticado.idEmpleado} empresaId={empleadoAutenticado.idEmpresa} />}

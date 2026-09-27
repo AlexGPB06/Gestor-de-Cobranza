@@ -30,6 +30,7 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
   const [filtroMora, setFiltroMora] = useState('todas');
   const [cargando, setCargando] = useState(true);
   const [asignando, setAsignando] = useState(false);
+  const [liberando, setLiberando] = useState(false);
   const [error, setError] = useState('');
   const [mensaje, setMensaje] = useState('');
   const [refresco, setRefresco] = useState(0);
@@ -52,18 +53,23 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
     return { misGestores, asignadas: resAsig.data.filter((a) => a.estatusActiva), libres };
   };
 
+  const aplicarDatos = (d) => {
+    setGestores(d.misGestores);
+    setAsignadas(d.asignadas);
+    setDeudasLibres(d.libres);
+    // Mantiene al gestor seleccionado si sigue en el equipo; si no, regresa
+    // al primero para no dejar la pantalla sin selección.
+    setGestorSel(prev => {
+      const actual = d.misGestores.find(g => Number(g.idEmpleado) === Number(prev?.idEmpleado));
+      return actual || d.misGestores[0] || null;
+    });
+    setSeleccionadas(new Set());
+  };
+
   useEffect(() => {
     let activo = true;
     obtenerDatos()
-      .then(d => {
-        if (activo) {
-          setGestores(d.misGestores);
-          setAsignadas(d.asignadas);
-          setDeudasLibres(d.libres);
-          setGestorSel(d.misGestores[0] || null);
-          setSeleccionadas(new Set());
-        }
-      })
+      .then(d => { if (activo) aplicarDatos(d); })
       .catch(() => { if (activo) setError('No se pudieron cargar los datos para asignar carteras.'); })
       .finally(() => { if (activo) setCargando(false); });
     return () => { activo = false; };
@@ -120,12 +126,8 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
         deudaIds: [...seleccionadas]
       });
       setMensaje(`✅ Cartera asignada: ${res.data.asignadas} cuenta(s) a ${gestorSel.nombreCompleto}${res.data.errores?.length ? ` (${res.data.errores.length} con error)` : ''}.`);
-      setSeleccionadas(new Set());
       const datos = await obtenerDatos();
-      setGestores(datos.misGestores);
-      setAsignadas(datos.asignadas);
-      setDeudasLibres(datos.libres);
-      setGestorSel(datos.misGestores[0] || null);
+      aplicarDatos(datos);
     } catch (err) {
       const detalleErr = err.response?.data;
       setMensaje(typeof detalleErr === 'string' ? `⚠️ ${detalleErr}` : '⚠️ Ocurrió un error al asignar la cartera.');
@@ -134,7 +136,33 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
     }
   };
 
+  const liberar = async (asignacion) => {
+    const cuenta = asignacion.deuda?.numeroCuenta || '';
+    const ok = window.confirm(
+      `¿Liberar la cuenta ${cuenta} de ${gestorSel?.nombreCompleto}? Volverá a la lista de cuentas sin asignar.`
+    );
+    if (!ok) return;
+
+    setLiberando(true);
+    setMensaje('');
+    try {
+      await axios.delete(`/api/asignaciones-cartera/${asignacion.idAsignacion}`);
+      setMensaje(`✅ Cuenta ${cuenta} liberada. Ya está disponible para reasignar.`);
+      const datos = await obtenerDatos();
+      aplicarDatos(datos);
+    } catch (err) {
+      const detalleErr = err.response?.data;
+      setMensaje(typeof detalleErr === 'string' ? `⚠️ ${detalleErr}` : '⚠️ No se pudo liberar la cuenta.');
+    } finally {
+      setLiberando(false);
+    }
+  };
+
   const conteoGestor = (g) => asignadas.filter(a => Number(a.empleado?.idEmpleado) === Number(g.idEmpleado)).length;
+
+  const asignadasDelGestor = gestorSel
+    ? asignadas.filter(a => Number(a.empleado?.idEmpleado) === Number(gestorSel.idEmpleado))
+    : [];
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6 animate-fade-in">
@@ -152,7 +180,7 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
       {mensaje && <div className="bg-slate-50 border border-slate-300 p-3 mb-4 rounded text-slate-700 font-semibold text-sm">{mensaje}</div>}
       {!cargando && !error && deudasLibres.length === 0 && (
         <div className="bg-emerald-50 border border-emerald-200 rounded-lg p-4 mb-6 text-emerald-800 text-sm font-semibold">
-          ✅ 0 cuentas por asignar · Toda la cartera del equipo ya está distribuida entre tus {gestores.length} gestores. Si necesitas reasignar, usa el botón <b>Dar de baja</b> desde Promesas del Equipo.
+          ✅ 0 cuentas por asignar · Toda la cartera del equipo ya está distribuida entre tus {gestores.length} gestores. Si necesitas reasignar, usa el botón <b>Quitar</b> sobre la cuenta asignada al gestor.
         </div>
       )}
 
@@ -189,6 +217,32 @@ export default function AsignacionSupervisor({ supervisorId, empresaId }) {
           </div>
 
           <div className="md:col-span-2">
+            {gestorSel && asignadasDelGestor.length > 0 && (
+              <div className="mb-5">
+                <h3 className="text-sm font-black text-slate-600 uppercase tracking-wider mb-3">
+                  Cuentas asignadas a {gestorSel.nombreCompleto} ({asignadasDelGestor.length})
+                </h3>
+                <div className="space-y-2">
+                  {asignadasDelGestor.map((a) => (
+                    <div key={a.idAsignacion} className="flex items-center gap-3 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3">
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-slate-800">{a.deuda?.numeroCuenta} — {a.deuda?.deudor?.nombreCompleto}</div>
+                        <div className="text-xs text-slate-500">Contrato TDC moroso · saldo {formatearDinero(a.deuda?.saldoPendiente)}</div>
+                      </div>
+                      <span className="shrink-0 font-black text-slate-700">{formatearDinero(a.deuda?.saldoPendiente)}</span>
+                      <button
+                        onClick={() => liberar(a)}
+                        disabled={liberando}
+                        className="shrink-0 px-3 py-1 text-xs font-bold rounded bg-red-50 text-red-700 hover:bg-red-100 disabled:opacity-40 transition-colors"
+                      >
+                        Quitar
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-2 mb-3">
               <h3 className="text-sm font-black text-slate-600 uppercase tracking-wider mr-1">Cuentas sin asignar ({deudasLibres.length})</h3>
               <input

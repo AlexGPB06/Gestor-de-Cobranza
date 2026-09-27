@@ -314,6 +314,95 @@ public class EmpleadoController {
         return ResponseEntity.ok(respuesta);
     }
 
+    /**
+     * Cambia la campana activa del empleado. Solo el administrador; la campana
+     * debe pertenecer a la empresa del empleado. Se desactivan las demas filas
+     * de roles_campana y se activa (o crea) la elegida.
+     */
+    @PutMapping("/{numeroEmpleado}/campana")
+    public ResponseEntity<?> cambiarCampana(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                            @PathVariable String numeroEmpleado,
+                                            @RequestBody Map<String, String> datos) {
+
+        JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
+        if (sesion == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Token ausente o inválido");
+        }
+        if (!sesion.tieneRol(ROL_ADMIN)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Solo el administrador puede cambiar la campaña de los empleados");
+        }
+
+        if (numeroEmpleado == null || !CODIGO_EMPLEADO.matcher(numeroEmpleado).matches()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El número de empleado debe ser de exactamente 5 caracteres alfanuméricos");
+        }
+
+        String idCampanaRaw = value(datos, "idCampana");
+        if (idCampanaRaw == null || idCampanaRaw.isBlank()) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("Debes indicar la campaña");
+        }
+        Long idCampana;
+        try {
+            idCampana = Long.parseLong(idCampanaRaw.trim());
+        } catch (NumberFormatException e) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("El id de campaña no es válido");
+        }
+
+        String codigo = numeroEmpleado.toUpperCase();
+        Optional<Empleado> empleadoOpt = empleadoRepository.findByNumeroEmpleado(codigo);
+        if (empleadoOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El número de empleado no está registrado");
+        }
+        Empleado empleado = empleadoOpt.get();
+        if (empleado.getEmpresa() == null) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("El empleado no tiene empresa asignada, no puede cambiarle la campaña");
+        }
+
+        Optional<Campana> campanaOpt = campanaRepository.findById(idCampana);
+        if (campanaOpt.isEmpty()) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La campaña indicada no existe");
+        }
+        Campana campana = campanaOpt.get();
+        if (campana.getEmpresa() == null
+                || !empleado.getEmpresa().getIdEmpresa().equals(campana.getEmpresa().getIdEmpresa())) {
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body("La campaña no pertenece a la empresa del empleado");
+        }
+
+        List<RolCampana> filas = rolCampanaRepository.findAll().stream()
+                .filter(rc -> rc.getEmpleado() != null
+                        && rc.getEmpleado().getIdEmpleado().equals(empleado.getIdEmpleado()))
+                .toList();
+
+        Optional<RolCampana> existente = filas.stream()
+                .filter(rc -> rc.getCampana() != null && rc.getCampana().getIdCampana().equals(idCampana))
+                .findFirst();
+        RolCampana objetivo = existente.orElseGet(() -> {
+            RolCampana nueva = new RolCampana();
+            nueva.setEmpleado(empleado);
+            nueva.setCampana(campana);
+            nueva.setRol(empleado.getRol());
+            return nueva;
+        });
+        objetivo.setActivo(true);
+        rolCampanaRepository.save(objetivo);
+
+        for (RolCampana fila : filas) {
+            if (fila != objetivo && Boolean.TRUE.equals(fila.getActivo())) {
+                fila.setActivo(false);
+                rolCampanaRepository.save(fila);
+            }
+        }
+
+        Map<String, Object> respuesta = new HashMap<>();
+        respuesta.put("mensaje", "Campaña actualizada a " + campana.getNombreEmpresa());
+        respuesta.put("numeroEmpleado", empleado.getNumeroEmpleado());
+        respuesta.put("idCampana", campana.getIdCampana());
+        respuesta.put("campana", campana.getNombreEmpresa());
+        return ResponseEntity.ok(respuesta);
+    }
+
     private void asignarRolEnCampana(Empleado empleado, String rol) {
         if (empleado.getEmpresa() == null) {
             return;

@@ -182,10 +182,13 @@ class ConfigAccesoTest {
     // --------------------------------------------------- escritura por rol
 
     @Test
-    void asignacionesDeCartera_EscrituraSoloDelAdministrador() {
+    void asignacionesDeCartera_EscrituraDelAdministradorYDelSupervisor() {
         permitido("POST", "/api/asignaciones-cartera", admin());
-        denegado("POST", "/api/asignaciones-cartera", supervisor(), HttpStatus.FORBIDDEN);
+        permitido("POST", "/api/asignaciones-cartera/por-lote", supervisor());
+        permitido("DELETE", "/api/asignaciones-cartera/12", supervisor());
         denegado("POST", "/api/asignaciones-cartera", gestor(), HttpStatus.FORBIDDEN);
+        denegado("POST", "/api/asignaciones-cartera/por-lote", gestor(), HttpStatus.FORBIDDEN);
+        denegado("DELETE", "/api/asignaciones-cartera/12", gestor(), HttpStatus.FORBIDDEN);
     }
 
     @Test

@@ -72,11 +72,11 @@ describe('vistas por rol', () => {
     expect(vistasPermitidas(ROL_GESTOR)).toEqual(['info', 'cartera', 'meta']);
   });
 
-  it('el administrador no ve ninguna vista de cobranza', () => {
+  it('el administrador solo gestiona personal, nunca cartera ni catalogos', () => {
     const vistas = vistasPermitidas(ROL_ADMINISTRADOR);
 
-    expect(vistas).toEqual(['empleados', 'asignacion', 'catalogos', 'auditoria', 'campanas']);
-    for (const vistaDeCobranza of ['info', 'cartera', 'meta', 'deudores', 'pagos', 'tickets']) {
+    expect(vistas).toEqual(['empleados']);
+    for (const vistaDeCobranza of ['info', 'cartera', 'meta', 'deudores', 'pagos', 'tickets', 'asignacion', 'catalogos', 'auditoria', 'campanas']) {
       expect(vistas).not.toContain(vistaDeCobranza);
     }
   });
@@ -145,12 +145,15 @@ describe('vistaInicial y resolverVista', () => {
 
   it('respeta la vista actual si el rol la tiene permitida', () => {
     expect(resolverVista(ROL_GESTOR, 'meta')).toBe('meta');
-    expect(resolverVista(ROL_ADMINISTRADOR, 'catalogos')).toBe('catalogos');
+    expect(resolverVista(ROL_ADMINISTRADOR, 'empleados')).toBe('empleados');
   });
 
   it('corige una vista no permitida en lugar de dejar la pantalla en blanco', () => {
     // Al cambiar de cuenta o entrar por un enlace directo no puede quedar 'info'.
     expect(resolverVista(ROL_ADMINISTRADOR, 'info')).toBe('empleados');
+    // Las vistas que el administrador dejo de tener caen en Empleados.
+    expect(resolverVista(ROL_ADMINISTRADOR, 'catalogos')).toBe('empleados');
+    expect(resolverVista(ROL_ADMINISTRADOR, 'auditoria')).toBe('empleados');
     expect(resolverVista(ROL_SUPERVISOR, 'info')).toBe('supervision');
     expect(resolverVista(ROL_GESTOR, 'auditoria')).toBe('info');
   });

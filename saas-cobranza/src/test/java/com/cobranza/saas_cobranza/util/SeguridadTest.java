@@ -102,24 +102,6 @@ class SeguridadTest {
         assertEquals(HttpStatus.FORBIDDEN, conSupervisor.getStatusCode());
     }
 
-    // -------------------------------------------------------------- solo admin
-
-    @Test
-    void soloAdmin_SinTokenRespondeUnauthorized() {
-        assertEquals(HttpStatus.UNAUTHORIZED, Seguridad.soloAdmin(null).getStatusCode());
-    }
-
-    @Test
-    void soloAdmin_ConAdminNoDevuelveRespuesta() {
-        assertNull(Seguridad.soloAdmin(admin()));
-    }
-
-    @Test
-    void soloAdmin_ConGestorOSupervisorRespondeForbidden() {
-        assertEquals(HttpStatus.FORBIDDEN, Seguridad.soloAdmin(gestor()).getStatusCode());
-        assertEquals(Seguridad.MENSAJE_NO_ADMIN, Seguridad.soloAdmin(supervisor()).getBody());
-    }
-
     // ------------------------------------------- administrador o supervisor
 
     @Test

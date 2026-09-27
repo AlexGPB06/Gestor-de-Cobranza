@@ -204,6 +204,16 @@ class AsignacionCarteraControllerTest {
         return empleado;
     }
 
+    private static Empleado gestorDe(long idGestor, long idSupervisor) {
+        Empleado gestor = new Empleado();
+        gestor.setIdEmpleado(idGestor);
+        gestor.setRol("GESTOR");
+        Empleado supervisor = new Empleado();
+        supervisor.setIdEmpleado(idSupervisor);
+        gestor.setSupervisor(supervisor);
+        return gestor;
+    }
+
     @Test
     void crear_ElAdministradorGuardaLaAsignacion() {
         AsignacionCartera asignacion = new AsignacionCartera();
@@ -216,6 +226,62 @@ class AsignacionCarteraControllerTest {
         assertEquals(HttpStatus.OK, respuesta.getStatusCode());
         assertEquals(asignacion, respuesta.getBody());
         verify(repository).save(asignacion);
+    }
+
+    @Test
+    void crear_ElSupervisorAsignaASuPropioGestor() {
+        AsignacionCartera asignacion = new AsignacionCartera();
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, ID_SUPERVISOR));
+        asignacion.setDeuda(deuda(4L));
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(gestorDe(ID_GESTOR, ID_SUPERVISOR)));
+        when(repository.save(asignacion)).thenReturn(asignacion);
+
+        ResponseEntity<?> respuesta = controller.crear(supervisor(), asignacion);
+
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        verify(repository).save(asignacion);
+    }
+
+    @Test
+    void crear_ElSupervisorNoAsignaAGestorDeOtroEquipo() {
+        AsignacionCartera asignacion = new AsignacionCartera();
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, 99L));
+        asignacion.setDeuda(deuda(4L));
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(gestorDe(ID_GESTOR, 99L)));
+
+        ResponseEntity<?> respuesta = controller.crear(supervisor(), asignacion);
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void crear_ElSupervisorNoAsignaANoGestor() {
+        AsignacionCartera asignacion = new AsignacionCartera();
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, ID_SUPERVISOR));
+        asignacion.setDeuda(deuda(4L));
+        Empleado noGestor = gestorDe(ID_GESTOR, ID_SUPERVISOR);
+        noGestor.setRol("SUPERVISOR");
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(noGestor));
+
+        ResponseEntity<?> respuesta = controller.crear(supervisor(), asignacion);
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void crear_ElSupervisorRespondeNotFoundSiElEmpleadoNoExiste() {
+        AsignacionCartera asignacion = new AsignacionCartera();
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, ID_SUPERVISOR));
+        asignacion.setDeuda(deuda(4L));
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.empty());
+
+        ResponseEntity<?> respuesta = controller.crear(supervisor(), asignacion);
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("El empleado no existe", respuesta.getBody());
+        verify(repository, never()).save(any());
     }
 
     // ------------------------------------------------------------ crearPorLote
@@ -330,5 +396,91 @@ class AsignacionCarteraControllerTest {
         List<String> errores = (List<String>) cuerpoRespuesta.get("errores");
         assertNotNull(errores);
         assertEquals(List.of("Deuda inexistente: 10", "Id inválido: abc"), errores);
+    }
+
+    @Test
+    void crearPorLote_ElSupervisorAsignaASuEquipo() {
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(gestorDe(ID_GESTOR, ID_SUPERVISOR)));
+
+        ResponseEntity<?> respuesta = controller.crearPorLote(supervisor(), cuerpo(ID_GESTOR, List.of()));
+
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void crearPorLote_ElSupervisorNoTocaElEquipoAjeno() {
+        when(empleadoRepository.findById(ID_GESTOR)).thenReturn(Optional.of(gestorDe(ID_GESTOR, 99L)));
+
+        ResponseEntity<?> respuesta = controller.crearPorLote(supervisor(), cuerpo(ID_GESTOR, List.of(1L)));
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    // ---------------------------------------------------------------- eliminar
+
+    @Test
+    void eliminar_SinTokenRespondeUnauthorized() {
+        assertEquals(HttpStatus.UNAUTHORIZED, controller.eliminar(null, 1L).getStatusCode());
+    }
+
+    @Test
+    void eliminar_ElGestorNoLiberaCuentas() {
+        ResponseEntity<?> respuesta = controller.eliminar(gestor(), 1L);
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void eliminar_AdminLiberaLaCuenta() {
+        AsignacionCartera asignacion = asignacion(1L);
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, ID_SUPERVISOR));
+        when(repository.findById(1L)).thenReturn(Optional.of(asignacion));
+        when(repository.save(asignacion)).thenReturn(asignacion);
+
+        ResponseEntity<?> respuesta = controller.eliminar(admin(), 1L);
+
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        assertEquals(false, asignacion.getEstatusActiva());
+        Map<String, Object> cuerpo = (Map<String, Object>) respuesta.getBody();
+        assertEquals("Cuenta liberada", cuerpo.get("mensaje"));
+        verify(repository).save(asignacion);
+    }
+
+    @Test
+    void eliminar_SupervisorLiberaLaCuentaDeSuEquipo() {
+        AsignacionCartera asignacion = asignacion(1L);
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, ID_SUPERVISOR));
+        when(repository.findById(1L)).thenReturn(Optional.of(asignacion));
+        when(repository.save(asignacion)).thenReturn(asignacion);
+
+        ResponseEntity<?> respuesta = controller.eliminar(supervisor(), 1L);
+
+        assertEquals(HttpStatus.OK, respuesta.getStatusCode());
+        verify(repository).save(asignacion);
+    }
+
+    @Test
+    void eliminar_SupervisorNoLiberaCuentasAjenas() {
+        AsignacionCartera asignacion = asignacion(1L);
+        asignacion.setEmpleado(gestorDe(ID_GESTOR, 99L));
+        when(repository.findById(1L)).thenReturn(Optional.of(asignacion));
+
+        ResponseEntity<?> respuesta = controller.eliminar(supervisor(), 1L);
+
+        assertEquals(HttpStatus.FORBIDDEN, respuesta.getStatusCode());
+        verify(repository, never()).save(any());
+    }
+
+    @Test
+    void eliminar_AsignacionInexistenteRespondeNotFound() {
+        when(repository.findById(77L)).thenReturn(Optional.empty());
+
+        ResponseEntity<?> respuesta = controller.eliminar(admin(), 77L);
+
+        assertEquals(HttpStatus.NOT_FOUND, respuesta.getStatusCode());
+        assertEquals("La asignación no existe", respuesta.getBody());
     }
 }

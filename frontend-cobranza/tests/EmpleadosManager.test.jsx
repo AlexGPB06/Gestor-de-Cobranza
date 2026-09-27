@@ -51,11 +51,32 @@ const DIRECTORIO = [
   },
 ];
 
+const CAMPANAS = [
+  { idCampana: 11, nombreEmpresa: 'Santander - Cobranza', empresa: { idEmpresa: 1 } },
+  { idCampana: 12, nombreEmpresa: 'Santander - Plus', empresa: { idEmpresa: 1 } },
+  { idCampana: 21, nombreEmpresa: 'BBVA - Cobranza', empresa: { idEmpresa: 2 } },
+];
+
+const ROLES_CAMPANA = [
+  {
+    idRolCampana: 500,
+    activo: true,
+    campana: { idCampana: 11, nombreEmpresa: 'Santander - Cobranza' },
+    empleado: { idEmpleado: 90 },
+  },
+];
+
 /** Responde por URL y devuelve un objeto que se puede reasignar por prueba. */
-function prepararRespuestas({ empleados = DIRECTORIO, empresas = EMPRESAS } = {}) {
+function prepararRespuestas({ empleados = DIRECTORIO, empresas = EMPRESAS, campanas = CAMPANAS, rolesCampana = ROLES_CAMPANA } = {}) {
   axios.get.mockImplementation((url) => {
     if (url.includes('/api/empresas')) {
       return Promise.resolve({ data: empresas });
+    }
+    if (url.includes('/api/campanas')) {
+      return Promise.resolve({ data: campanas });
+    }
+    if (url.includes('/api/roles-campana')) {
+      return Promise.resolve({ data: rolesCampana });
     }
     if (url.includes('/api/empleados')) {
       return Promise.resolve({ data: empleados });
@@ -361,5 +382,64 @@ describe('EmpleadosManager: baja, reactivacion y cambio de rol', () => {
     expect(
       await screen.findByText('Solo el administrador puede dar de baja'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('EmpleadosManager: columna y cambio de campaña', () => {
+  it('muestra la campaña activa de cada empleado', async () => {
+    render(<EmpleadosManager empresaId={1} />);
+
+    expect(await screen.findByText('Verónica Castillo')).toBeInTheDocument();
+    expect(screen.getByText('Santander - Cobranza')).toBeInTheDocument();
+  });
+
+  it('muestra un guion cuando el empleado no tiene campaña activa', async () => {
+    render(<EmpleadosManager empresaId={1} />);
+
+    const fila = (await screen.findByText('María Teresa Gil')).closest('tr');
+    expect(within(fila).getByText('—')).toBeInTheDocument();
+  });
+
+  it('cambia la campaña del empleado tras confirmar', async () => {
+    axios.put.mockResolvedValue({ data: { mensaje: 'Campaña actualizada a Santander - Plus' } });
+    const usuario = userEvent.setup();
+    render(<EmpleadosManager empresaId={1} />);
+
+    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
+    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
+    await usuario.selectOptions(within(fila).getByRole('combobox'), '12');
+    await usuario.click(within(fila).getByRole('button', { name: /guardar/i }));
+
+    await waitFor(() =>
+      expect(axios.put).toHaveBeenCalledWith('/api/empleados/S1G01/campana', {
+        idCampana: '12',
+      }),
+    );
+    expect(await screen.findByText('Campaña actualizada a Santander - Plus')).toBeInTheDocument();
+  });
+
+  it('solo ofrece campanas de la empresa del empleado', async () => {
+    const usuario = userEvent.setup();
+    render(<EmpleadosManager empresaId={1} />);
+
+    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
+    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
+
+    const opciones = [...within(fila).getByRole('combobox').options].map(o => o.textContent);
+    expect(opciones).toEqual(['Selecciona campaña...', 'Santander - Cobranza', 'Santander - Plus']);
+    expect(opciones).not.toContain('BBVA - Cobranza');
+  });
+
+  it('no hace nada si el usuario cancela el cambio de campaña', async () => {
+    window.confirm = jest.fn(() => false);
+    const usuario = userEvent.setup();
+    render(<EmpleadosManager empresaId={1} />);
+
+    const fila = (await screen.findByText('Verónica Castillo')).closest('tr');
+    await usuario.click(within(fila).getByRole('button', { name: /cambiar campaña/i }));
+    await usuario.selectOptions(within(fila).getByRole('combobox'), '12');
+    await usuario.click(within(fila).getByRole('button', { name: /guardar/i }));
+
+    expect(axios.put).not.toHaveBeenCalled();
   });
 });

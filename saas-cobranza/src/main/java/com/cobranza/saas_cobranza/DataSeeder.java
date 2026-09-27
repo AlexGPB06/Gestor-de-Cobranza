@@ -39,6 +39,9 @@ public class DataSeeder implements CommandLineRunner {
     private ConceptoRepository conceptoRepository;
 
     @Autowired
+    private MotivoNoPagoRepository motivoNoPagoRepository;
+
+    @Autowired
     private TipoTicketRepository tipoTicketRepository;
 
     @Autowired
@@ -61,6 +64,8 @@ public class DataSeeder implements CommandLineRunner {
     public void run(String... args) {
         semillasEmpresas();
         semillasCampanas();
+        semillasConceptos();
+        semillasMotivosNoPago();
         semillasTiposPromesa();
         semillasDepartamentos();
         semillasAdmin();
@@ -205,6 +210,70 @@ public class DataSeeder implements CommandLineRunner {
         admin.setDepartamento(depto);
         admin.setEmpresa(empresa);
         empleadoRepository.save(admin);
+    }
+
+    /**
+     * Conceptos de gestion que el gestor elige al capturar la llamada. La
+     * categoria "PROMESA" (o el nombre "Promesa de pago") es lo que desbloquea
+     * el bloque de fecha, monto y tipo de promesa en el formulario.
+     */
+    private void semillasConceptos() {
+        String[][] base = {
+                {"Promesa de pago", "PROMESA"},
+                {"No contesta", "CONTACTO"},
+                {"Buzón", "BUZON"},
+                {"Negativa de pago", "NEGATIVA"},
+                {"Contacto sin acuerdo", "CONTACTO"},
+                {"Número equivocado", "CONTACTO"}
+        };
+        for (Campana campana : campanaRepository.findAll()) {
+            Long idEmpresa = campana.getEmpresa().getIdEmpresa();
+            List<Concepto> existentes = conceptoRepository.findByCampana_Empresa_IdEmpresa(idEmpresa);
+            for (String[] c : base) {
+                boolean existe = existentes.stream().anyMatch(x ->
+                        x.getCampana() != null && x.getCampana().getIdCampana().equals(campana.getIdCampana())
+                                && x.getNombreConcepto().equalsIgnoreCase(c[0]));
+                if (existe) {
+                    continue;
+                }
+                Concepto concepto = new Concepto();
+                concepto.setCampana(campana);
+                concepto.setNombreConcepto(c[0]);
+                concepto.setCategoria(c[1]);
+                concepto.setRequiereAutorizacion(false);
+                concepto.setActivo(true);
+                conceptoRepository.save(concepto);
+            }
+        }
+    }
+
+    /** Motivos de no pago que el gestor reporta junto con el concepto. */
+    private void semillasMotivosNoPago() {
+        String[] base = {
+                "Falta de fondos",
+                "No desea pagar",
+                "No recuerda la deuda",
+                "Datos de contacto incorrectos",
+                "Reclamo o disputa en curso",
+                "Ya realizó el pago"
+        };
+        for (Campana campana : campanaRepository.findAll()) {
+            Long idEmpresa = campana.getEmpresa().getIdEmpresa();
+            List<MotivoNoPago> existentes = motivoNoPagoRepository.findByCampana_Empresa_IdEmpresa(idEmpresa);
+            for (String descripcion : base) {
+                boolean existe = existentes.stream().anyMatch(x ->
+                        x.getCampana() != null && x.getCampana().getIdCampana().equals(campana.getIdCampana())
+                                && x.getDescripcion().equalsIgnoreCase(descripcion));
+                if (existe) {
+                    continue;
+                }
+                MotivoNoPago motivo = new MotivoNoPago();
+                motivo.setCampana(campana);
+                motivo.setDescripcion(descripcion);
+                motivo.setActivo(true);
+                motivoNoPagoRepository.save(motivo);
+            }
+        }
     }
 
     private void semillasTiposPromesa() {

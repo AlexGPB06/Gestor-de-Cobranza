@@ -67,14 +67,24 @@ public class AsignacionCarteraController {
     @PostMapping
     public ResponseEntity<?> crear(@RequestHeader(value = "Authorization", required = false) String authorization,
                                    @RequestBody AsignacionCartera asignacion) {
-        ResponseEntity<?> bloqueado = Seguridad.soloAdmin(authorization);
-        if (bloqueado != null) {
-            return bloqueado;
+        JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (!Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del administrador o del supervisor.");
         }
         if (asignacion.getEmpleado() == null || asignacion.getEmpleado().getIdEmpleado() == null
                 || asignacion.getDeuda() == null || asignacion.getDeuda().getIdDeuda() == null) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body("La asignación requiere el empleado y la deuda");
+        }
+        if (Seguridad.esSupervisor(sesion)) {
+            ResponseEntity<?> bloqueado = validarGestorDeSuEquipo(sesion, asignacion.getEmpleado().getIdEmpleado());
+            if (bloqueado != null) {
+                return bloqueado;
+            }
         }
         return ResponseEntity.ok(repository.save(asignacion));
     }
@@ -82,9 +92,13 @@ public class AsignacionCarteraController {
     @PostMapping("/por-lote")
     public ResponseEntity<?> crearPorLote(@RequestHeader(value = "Authorization", required = false) String authorization,
                                           @RequestBody Map<String, Object> body) {
-        ResponseEntity<?> bloqueado = Seguridad.soloAdmin(authorization);
-        if (bloqueado != null) {
-            return bloqueado;
+        JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (!Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del administrador o del supervisor.");
         }
         Object empleadoRaw = body.get("empleadoId");
         Object deudasRaw = body.get("deudaIds");
@@ -95,6 +109,12 @@ public class AsignacionCarteraController {
         Empleado empleado = empleadoRepository.findById(empleadoId).orElse(null);
         if (empleado == null) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El empleado no existe");
+        }
+        if (Seguridad.esSupervisor(sesion)) {
+            ResponseEntity<?> bloqueado = validarGestorDeSuEquipo(sesion, empleadoId);
+            if (bloqueado != null) {
+                return bloqueado;
+            }
         }
         if (!(deudasRaw instanceof List<?>)) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body("deudaIds debe ser una lista");
@@ -130,5 +150,65 @@ public class AsignacionCarteraController {
         respuesta.put("asignadas", asignadas);
         respuesta.put("errores", errores);
         return ResponseEntity.ok(respuesta);
+    }
+
+    /**
+     * Libera una cuenta (estatusActiva = false) para poder reasignarla. El
+     * administrador libera cualquier cuenta; el supervisor solo las de los
+     * gestores de su propio equipo.
+     */
+    @DeleteMapping("/{idAsignacion}")
+    public ResponseEntity<?> eliminar(@RequestHeader(value = "Authorization", required = false) String authorization,
+                                      @PathVariable Long idAsignacion) {
+        JwtUtil.Sesion sesion = JwtUtil.autenticar(authorization);
+        if (sesion == null) {
+            return Seguridad.sinToken();
+        }
+        if (!Seguridad.esAdmin(sesion) && !Seguridad.esSupervisor(sesion)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Acceso exclusivo del administrador o del supervisor.");
+        }
+        AsignacionCartera asignacion = repository.findById(idAsignacion).orElse(null);
+        if (asignacion == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("La asignación no existe");
+        }
+        if (Seguridad.esSupervisor(sesion)) {
+            Empleado destino = asignacion.getEmpleado();
+            boolean esDeSuEquipo = destino != null && destino.getSupervisor() != null
+                    && destino.getSupervisor().getIdEmpleado() != null
+                    && destino.getSupervisor().getIdEmpleado().equals(sesion.idEmpleado());
+            if (!esDeSuEquipo) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Un supervisor solo puede modificar las carteras de su propio equipo.");
+            }
+        }
+        asignacion.setEstatusActiva(false);
+        repository.save(asignacion);
+
+        Map<String, Object> respuesta = new java.util.HashMap<>();
+        respuesta.put("mensaje", "Cuenta liberada");
+        respuesta.put("idAsignacion", asignacion.getIdAsignacion());
+        return ResponseEntity.ok(respuesta);
+    }
+
+    /**
+     * El supervisor solo reparte cartera entre gestores que le reportan: rol
+     * GESTOR y supervisor = yo. El administrador no tiene esta restriccion.
+     */
+    private ResponseEntity<?> validarGestorDeSuEquipo(JwtUtil.Sesion sesion, Long empleadoDestinoId) {
+        Empleado destino = empleadoRepository.findById(empleadoDestinoId).orElse(null);
+        if (destino == null) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body("El empleado no existe");
+        }
+        boolean esGestor = "GESTOR".equalsIgnoreCase(destino.getRol())
+                || "USUARIO".equalsIgnoreCase(destino.getRol());
+        boolean esDeSuEquipo = destino.getSupervisor() != null
+                && destino.getSupervisor().getIdEmpleado() != null
+                && destino.getSupervisor().getIdEmpleado().equals(sesion.idEmpleado());
+        if (!esGestor || !esDeSuEquipo) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body("Un supervisor solo puede asignar carteras a gestores de su propio equipo.");
+        }
+        return null;
     }
 }

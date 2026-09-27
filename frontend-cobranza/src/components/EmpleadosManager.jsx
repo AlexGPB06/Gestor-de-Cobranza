@@ -12,6 +12,8 @@ const mensajeError = (error, porDefecto) => {
 export default function EmpleadosManager({ empresaId }) {
   const [empleados, setEmpleados] = useState([]);
   const [empresas, setEmpresas] = useState([]);
+  const [campanas, setCampanas] = useState([]);
+  const [rolesCampana, setRolesCampana] = useState([]);
   const [empresaSel, setEmpresaSel] = useState('');
   const [cargando, setCargando] = useState(false);
   const [notificacion, setNotificacion] = useState({ tipo: '', mensaje: '' });
@@ -23,7 +25,9 @@ export default function EmpleadosManager({ empresaId }) {
   const [rolSeleccionado, setRolSeleccionado] = useState('GESTOR');
   const [supervisorSel, setSupervisorSel] = useState('');
   const [editandoId, setEditandoId] = useState(null);
+  const [modoEdicion, setModoEdicion] = useState('rol'); // 'rol' | 'campana'
   const [rolEdit, setRolEdit] = useState('');
+  const [campanaEdit, setCampanaEdit] = useState('');
 
   useEffect(() => {
     cargarDatos();
@@ -46,6 +50,14 @@ export default function EmpleadosManager({ empresaId }) {
       console.error("Error al cargar empleados:", error);
       setNotificacion({ tipo: 'error', mensaje: mensajeError(error, 'No se pudo cargar el directorio.') });
     }
+    // Campañas y roles_campana nutren la columna "Campaña"; si fallan la
+    // tabla simplemente muestra "—" en lugar de tumbar el directorio.
+    axios.get('/api/campanas')
+      .then(res => setCampanas(res.data))
+      .catch(err => console.error("Error al cargar campañas:", err));
+    axios.get('/api/roles-campana')
+      .then(res => setRolesCampana(res.data))
+      .catch(err => console.error("Error al cargar roles por campaña:", err));
   }
 
   const generarCodigoAleatorio = () => {
@@ -145,6 +157,39 @@ export default function EmpleadosManager({ empresaId }) {
     }
   };
 
+  const handleCambiarCampana = async (empleado) => {
+    if (!campanaEdit) {
+      setNotificacion({ tipo: 'error', mensaje: 'Selecciona la campaña de destino.' });
+      return;
+    }
+    const destino = campanas.find(c => String(c.idCampana) === String(campanaEdit));
+    const ok = window.confirm(
+      `¿Cambiar a ${empleado.nombreCompleto} (${empleado.numeroEmpleado}) a la campaña ${destino?.nombreEmpresa || ''}?`
+    );
+    if (!ok) return;
+
+    setNotificacion({ tipo: '', mensaje: '' });
+    try {
+      const respuesta = await axios.put(`/api/empleados/${empleado.numeroEmpleado}/campana`, {
+        idCampana: String(campanaEdit)
+      });
+      setNotificacion({ tipo: 'exito', mensaje: respuesta.data?.mensaje || 'Campaña actualizada' });
+      setEditandoId(null);
+      await cargarDatos();
+    } catch (error) {
+      console.error("Error al cambiar la campaña:", error);
+      setNotificacion({ tipo: 'error', mensaje: mensajeError(error, 'No se pudo cambiar la campaña.') });
+    }
+  };
+
+  const campanasDe = (empleado) => {
+    const id = empleado.empresa?.idEmpresa ?? empresaId;
+    return campanas.filter(c => String(c.empresa?.idEmpresa) === String(id));
+  };
+
+  const campanaActivaDe = (empleado) =>
+    rolesCampana.filter(r => r.activo && r.empleado?.idEmpleado === empleado.idEmpleado);
+
   const supervisores = empleados.filter((emp) => emp.rol === 'SUPERVISOR');
 
   const empleadosFiltrados = (() => {
@@ -169,7 +214,7 @@ export default function EmpleadosManager({ empresaId }) {
   return (
     <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
       <div className="mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Alta, Baja y Roles de Empleados</h2>
+        <h2 className="text-2xl font-bold text-slate-800">Alta, Baja, Roles y Campañas de Empleados</h2>
         <p className="text-sm text-slate-500 mt-1">
           Registra al personal y entrégale su número de empleado. Con ese número él mismo crea su usuario y contraseña.
         </p>
@@ -291,16 +336,17 @@ export default function EmpleadosManager({ empresaId }) {
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Número / Empleado</th>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Usuario</th>
                   <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Rol</th>
+                  <th className="px-6 py-3 text-left font-bold text-slate-500 uppercase tracking-wider">Campaña</th>
                   <th className="px-6 py-3 text-center font-bold text-slate-500 uppercase tracking-wider">Estatus</th>
                   <th className="px-6 py-3 text-center font-bold text-slate-500 uppercase tracking-wider">Acción</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-slate-200">
                 {empleados.length === 0 ? (
-                  <tr><td colSpan="5" className="px-6 py-8 text-center text-slate-500 italic">Cargando directorio...</td></tr>
+                  <tr><td colSpan="6" className="px-6 py-8 text-center text-slate-500 italic">Cargando directorio...</td></tr>
                 ) : empleadosFiltrados.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan="6" className="px-6 py-8 text-center text-slate-500">
                       Sin resultados para <span className="font-mono font-bold text-slate-700">{busqueda}</span>
                     </td>
                   </tr>
@@ -321,6 +367,21 @@ export default function EmpleadosManager({ empresaId }) {
                             {emp.rol || 'USUARIO'}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {(() => {
+                            const activas = campanaActivaDe(emp);
+                            if (activas.length === 0) {
+                              return <span className="italic text-slate-400">—</span>;
+                            }
+                            const extra = activas.length - 1;
+                            return (
+                              <span className="text-xs font-semibold text-slate-700">
+                                {activas[0].campana?.nombreEmpresa || '—'}
+                                {extra > 0 && <span className="text-slate-400 font-bold"> (+{extra})</span>}
+                              </span>
+                            );
+                          })()}
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {emp.activo && !sinUsuario ? (
                             <span className="px-2 py-1 inline-flex text-xs font-bold rounded-full bg-green-100 text-green-800">Activo</span>
@@ -333,17 +394,30 @@ export default function EmpleadosManager({ empresaId }) {
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           {editandoId === emp.idEmpleado ? (
                             <div className="flex items-center justify-center gap-1">
-                              <select
-                                value={rolEdit}
-                                onChange={(e) => setRolEdit(e.target.value)}
-                                className="p-1 border border-slate-300 rounded text-xs bg-white"
-                              >
-                                {ROLES.map(r => (
-                                  <option key={r} value={r}>{r}</option>
-                                ))}
-                              </select>
+                              {modoEdicion === 'campana' ? (
+                                <select
+                                  value={campanaEdit}
+                                  onChange={(e) => setCampanaEdit(e.target.value)}
+                                  className="p-1 border border-slate-300 rounded text-xs bg-white"
+                                >
+                                  <option value="">Selecciona campaña...</option>
+                                  {campanasDe(emp).map(c => (
+                                    <option key={c.idCampana} value={String(c.idCampana)}>{c.nombreEmpresa}</option>
+                                  ))}
+                                </select>
+                              ) : (
+                                <select
+                                  value={rolEdit}
+                                  onChange={(e) => setRolEdit(e.target.value)}
+                                  className="p-1 border border-slate-300 rounded text-xs bg-white"
+                                >
+                                  {ROLES.map(r => (
+                                    <option key={r} value={r}>{r}</option>
+                                  ))}
+                                </select>
+                              )}
                               <button
-                                onClick={() => handleCambiarRol(emp)}
+                                onClick={() => modoEdicion === 'campana' ? handleCambiarCampana(emp) : handleCambiarRol(emp)}
                                 className="px-2 py-1 text-xs font-bold rounded bg-blue-600 text-white hover:bg-blue-700 transition-colors"
                               >
                                 Guardar
@@ -376,11 +450,22 @@ export default function EmpleadosManager({ empresaId }) {
                               <button
                                 onClick={() => {
                                   setEditandoId(emp.idEmpleado);
+                                  setModoEdicion('rol');
                                   setRolEdit(emp.rol || 'GESTOR');
                                 }}
                                 className="px-3 py-1 text-xs font-bold rounded bg-purple-50 text-purple-700 hover:bg-purple-100 transition-colors"
                               >
                                 Cambiar rol
+                              </button>
+                              <button
+                                onClick={() => {
+                                  setEditandoId(emp.idEmpleado);
+                                  setModoEdicion('campana');
+                                  setCampanaEdit(String(campanaActivaDe(emp)[0]?.campana?.idCampana ?? ''));
+                                }}
+                                className="px-3 py-1 text-xs font-bold rounded bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors"
+                              >
+                                Cambiar campaña
                               </button>
                             </div>
                           )}

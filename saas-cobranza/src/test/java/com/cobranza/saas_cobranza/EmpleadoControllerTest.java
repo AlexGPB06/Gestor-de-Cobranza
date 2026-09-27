@@ -437,6 +437,123 @@ class EmpleadoControllerTest {
         assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
     }
 
+    private static Empresa empresa(long id) {
+        Empresa empresa = new Empresa();
+        empresa.setIdEmpresa(id);
+        empresa.setNombre("Empresa " + id);
+        return empresa;
+    }
+
+    private static Campana campana(long id, Empresa empresa) {
+        Campana campana = new Campana();
+        campana.setIdCampana(id);
+        campana.setEmpresa(empresa);
+        campana.setNombreEmpresa("Campaña " + id);
+        return campana;
+    }
+
+    private static Map<String, String> datosCampana(String idCampana) {
+        Map<String, String> datos = new HashMap<>();
+        if (idCampana != null) {
+            datos.put("idCampana", idCampana);
+        }
+        return datos;
+    }
+
+    @Test
+    void cambiarCampana_CampanaValida_DeberiaDesactivarLasDemas() {
+        Empresa empresa1 = empresa(1L);
+        empleadoGestorMock.setEmpresa(empresa1);
+        Campana elegida = campana(2L, empresa1);
+
+        RolCampana filaVieja = new RolCampana();
+        filaVieja.setEmpleado(empleadoGestorMock);
+        filaVieja.setCampana(campana(1L, empresa1));
+        filaVieja.setRol("GESTOR");
+        filaVieja.setActivo(true);
+
+        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+        when(campanaRepository.findById(2L)).thenReturn(Optional.of(elegida));
+        when(rolCampanaRepository.findAll()).thenReturn(List.of(filaVieja));
+        when(rolCampanaRepository.save(any(RolCampana.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "S1G01", datosCampana("2"));
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertEquals(false, filaVieja.getActivo());
+        Map<String, Object> body = (Map<String, Object>) response.getBody();
+        assertEquals("Campaña 2", body.get("campana"));
+        assertEquals("S1G01", body.get("numeroEmpleado"));
+    }
+
+    @Test
+    void cambiarCampana_SinToken_DeberiaRetornar401() {
+        ResponseEntity<?> response = empleadoController.cambiarCampana(null, "S1G01", datosCampana("2"));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarCampana_Gestor_DeberiaRetornar403() {
+        String tokenGestor = JwtUtil.generarToken("2", "GESTOR", "gestor.s1.01", "S1G01");
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(
+                "Bearer " + tokenGestor, "S1G01", datosCampana("2"));
+
+        assertEquals(HttpStatus.FORBIDDEN, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarCampana_SinIdCampana_DeberiaRetornar400() {
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "S1G01", datosCampana(null));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("Debes indicar la campaña", response.getBody());
+    }
+
+    @Test
+    void cambiarCampana_NumeroInexistente_DeberiaRetornar404() {
+        when(empleadoRepository.findByNumeroEmpleado("ZZZZZ")).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "ZZZZZ", datosCampana("2"));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+    }
+
+    @Test
+    void cambiarCampana_CampanaInexistente_DeberiaRetornar404() {
+        empleadoGestorMock.setEmpresa(empresa(1L));
+        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+        when(campanaRepository.findById(99L)).thenReturn(Optional.empty());
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "S1G01", datosCampana("99"));
+
+        assertEquals(HttpStatus.NOT_FOUND, response.getStatusCode());
+        assertEquals("La campaña indicada no existe", response.getBody());
+    }
+
+    @Test
+    void cambiarCampana_DeOtraEmpresa_DeberiaRetornar400() {
+        empleadoGestorMock.setEmpresa(empresa(1L));
+        Campana ajena = campana(3L, empresa(2L));
+        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+        when(campanaRepository.findById(3L)).thenReturn(Optional.of(ajena));
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "S1G01", datosCampana("3"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+        assertEquals("La campaña no pertenece a la empresa del empleado", response.getBody());
+    }
+
+    @Test
+    void cambiarCampana_EmpleadoSinEmpresa_DeberiaRetornar400() {
+        when(empleadoRepository.findByNumeroEmpleado("S1G01")).thenReturn(Optional.of(empleadoGestorMock));
+
+        ResponseEntity<?> response = empleadoController.cambiarCampana(tokenAdmin(), "S1G01", datosCampana("2"));
+
+        assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
+    }
+
     private String tokenAdmin() {
         return "Bearer " + JwtUtil.generarToken("1", "ADMINISTRADOR", "admin", "A1X2B");
     }

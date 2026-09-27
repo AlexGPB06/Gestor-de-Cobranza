@@ -18,9 +18,9 @@ import java.util.Set;
  * Matriz de acceso de la API.
  *
  * Gestion/Info (cartera, deudores, payments, tickets) y la meta propia son
- * territorio exclusivo del GESTOR. El ADMINISTRADOR no opera la cobranza: solo
- * administra personal, catalogos, asignacion de carteras y auditoria. El
- * SUPERVISOR no cobra: solo observa a su equipo.
+ * territorio exclusivo del GESTOR. El ADMINISTRADOR no opera la cartera: solo
+ * administra el personal. El SUPERVISOR no cobra: observa a su equipo y
+ * reparte las carteras entre sus propios gestores.
  *
  * Los controladores de la operacion diaria (Gestion, Deudor, Deuda, Pago,
  * Ticket, Supervision, AsignacionCartera) validan ademas la pertenencia del
@@ -69,12 +69,16 @@ public class ConfigAcceso implements WebMvcConfigurer {
     /** Solo lectura de supervision. */
     private static final List<String> SUPERVISION = List.of("/api/supervision");
 
-    /** Escritura que el administrador comparte con quien corresponde. */
-    private static final List<String> ESCRITURA_ADMIN = List.of(
-            "/api/asignaciones-cartera", "/api/empleados"
-    );
+    /** Escritura que solo hace el administrador. */
+    private static final List<String> ESCRITURA_ADMIN = List.of("/api/empleados");
 
-    private static final List<String> ESCRITURA_ADMIN_O_SUPERVISOR = List.of("/api/metas");
+    /**
+     * Asignacion de carteras: el administrador reparte libremente y el
+     * supervisor lo hace solo dentro de su equipo (lo valida el controlador).
+     */
+    private static final List<String> ESCRITURA_ADMIN_O_SUPERVISOR = List.of(
+            "/api/metas", "/api/asignaciones-cartera"
+    );
 
     /** Catalogs: cualquiera los lee, el administrador los escribe. */
     private static final List<String> CATALOGOS = List.of(

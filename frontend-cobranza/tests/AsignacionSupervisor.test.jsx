@@ -30,7 +30,7 @@ const DEUDAS = [
 ];
 
 const ASIGNACIONES = [
-  { idAsignacion: 1, estatusActiva: true, deuda: { idDeuda: 5 }, empleado: { idEmpleado: 10 } },
+  { idAsignacion: 1, estatusActiva: true, deuda: { idDeuda: 5, numeroCuenta: 'CU-005', saldoPendiente: 4000, estado: 'LIQUIDADA', deudor: { nombreCompleto: 'Luis Paz' } }, empleado: { idEmpleado: 10 } },
   { idAsignacion: 2, estatusActiva: false, deuda: { idDeuda: 2 }, empleado: { idEmpleado: 11 } },
   { idAsignacion: 3, estatusActiva: true, deuda: null, empleado: null },
 ];
@@ -423,6 +423,71 @@ describe('AsignacionSupervisor: asignar', () => {
     await usuario.click(screen.getByRole('button', { name: /Asignar 1 cuenta/ }));
 
     expect(await screen.findByText('⚠️ Ocurrió un error al asignar la cartera.')).toBeInTheDocument();
+  });
+});
+
+describe('AsignacionSupervisor: liberar cuenta', () => {
+  it('lista las cuentas del gestor seleccionado con su boton Quitar', async () => {
+    responder();
+    renderizar();
+    await waitFor(() => expect(screen.getByText('Ana Torres')).toBeInTheDocument());
+
+    // Ana tiene la CU-005 asignada; la seccion usa divs para no meterse en la
+    // lista de cuentas libres.
+    expect(screen.getByText(/Cuentas asignadas a Ana Torres \(1\)/)).toBeInTheDocument();
+    expect(screen.getByText('CU-005 — Luis Paz')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Quitar' })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByText('Luis Paz'));
+    expect(screen.queryByText(/Cuentas asignadas a/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Quitar' })).toBeNull();
+  });
+
+  it('libera la cuenta tras confirmar y recarga los datos', async () => {
+    window.confirm = jest.fn(() => true);
+    axios.delete.mockResolvedValue({ data: { mensaje: 'Cuenta liberada' } });
+    const usuario = userEvent.setup();
+    responder();
+    renderizar();
+    await waitFor(() => expect(screen.getByText('Ana Torres')).toBeInTheDocument());
+
+    await usuario.click(screen.getByRole('button', { name: 'Quitar' }));
+
+    await waitFor(() =>
+      expect(axios.delete).toHaveBeenCalledWith('/api/asignaciones-cartera/1'),
+    );
+    expect(await screen.findByText(/Cuenta CU-005 liberada/)).toBeInTheDocument();
+    expect(window.confirm).toHaveBeenCalled();
+  });
+
+  it('no libera nada si el usuario cancela la confirmacion', async () => {
+    window.confirm = jest.fn(() => false);
+    const usuario = userEvent.setup();
+    responder();
+    renderizar();
+    await waitFor(() => expect(screen.getByText('Ana Torres')).toBeInTheDocument());
+
+    await usuario.click(screen.getByRole('button', { name: 'Quitar' }));
+
+    expect(axios.delete).not.toHaveBeenCalled();
+    expect(screen.getByText(/Cuentas asignadas a Ana Torres/)).toBeInTheDocument();
+  });
+
+  it('muestra el error del backend al liberar', async () => {
+    window.confirm = jest.fn(() => true);
+    axios.delete.mockRejectedValue({
+      response: { data: 'Un supervisor solo puede modificar las carteras de su propio equipo.' },
+    });
+    const usuario = userEvent.setup();
+    responder();
+    renderizar();
+    await waitFor(() => expect(screen.getByText('Ana Torres')).toBeInTheDocument());
+
+    await usuario.click(screen.getByRole('button', { name: 'Quitar' }));
+
+    expect(
+      await screen.findByText(/Un supervisor solo puede modificar las carteras de su propio equipo/),
+    ).toBeInTheDocument();
   });
 });
 

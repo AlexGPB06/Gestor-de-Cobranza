@@ -36,10 +36,6 @@ jest.mock('../src/components/CarteraGestor', () => ({
 }));
 jest.mock('../src/components/MiMeta', () => marca('VISTA_META'));
 jest.mock('../src/components/MiMetaEquipo', () => marca('VISTA_META_EQUIPO'));
-jest.mock('../src/components/CampanaList', () => marca('VISTA_CAMPANAS'));
-jest.mock('../src/components/CatalogosManager', () => marca('VISTA_CATALOGOS'));
-jest.mock('../src/components/AuditoriaViewer', () => marca('VISTA_AUDITORIA'));
-jest.mock('../src/components/AsignacionCartera', () => marca('VISTA_ASIGNACION'));
 jest.mock('../src/components/EmpleadosManager', () => marca('VISTA_EMPLEADOS'));
 jest.mock('../src/components/SupervisionPanel', () => marca('VISTA_SUPERVISION'));
 jest.mock('../src/components/AsignacionSupervisor', () => marca('VISTA_ASIGNACION_SUP'));
@@ -200,7 +196,7 @@ describe('App: permisos por rol', () => {
     iniciarSesion('GESTOR');
     render(<App />);
 
-    expect(screen.queryByRole('button', { name: /alta \/ baja de empleados/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /gestión de empleados/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /catálogos/i })).toBeNull();
   });
 
@@ -226,23 +222,21 @@ describe('App: navegacion entre vistas', () => {
     expect(await screen.findByText('VISTA_META')).toBeInTheDocument();
   });
 
-  it('el administrador recorre las pantallas de administracion', async () => {
+  it('el administrador solo navega dentro del gestor de empleados', async () => {
     iniciarSesion('ADMINISTRADOR');
     const usuario = userEvent.setup();
     render(<App />);
     await screen.findByText('VISTA_EMPLEADOS');
 
-    await usuario.click(screen.getByRole('button', { name: /asignar cartera/i }));
-    expect(await screen.findByText('VISTA_ASIGNACION')).toBeInTheDocument();
+    // Asignar cartera, catalogos, bitacora y campanas salieron del menu del
+    // administrador: esa operacion ahora es de los supervisores.
+    expect(screen.queryByRole('button', { name: /asignar cartera/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /catálogos/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /bitácora/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /campañas/i })).toBeNull();
 
-    await usuario.click(screen.getByRole('button', { name: /catálogos/i }));
-    expect(await screen.findByText('VISTA_CATALOGOS')).toBeInTheDocument();
-
-    await usuario.click(screen.getByRole('button', { name: /bitácora/i }));
-    expect(await screen.findByText('VISTA_AUDITORIA')).toBeInTheDocument();
-
-    await usuario.click(screen.getByRole('button', { name: /campañas/i }));
-    expect(await screen.findByText('VISTA_CAMPANAS')).toBeInTheDocument();
+    await usuario.click(screen.getByRole('button', { name: /gestión de empleados/i }));
+    expect(await screen.findByText('VISTA_EMPLEADOS')).toBeInTheDocument();
   });
 
   it('el supervisor recorre sus cuatro pantallas', async () => {
@@ -276,19 +270,21 @@ describe('App: consultas al backend segun el rol', () => {
     iniciarSesion('ADMINISTRADOR');
     render(<App />);
 
-    await waitFor(() => expect(urlPedida('/api/campanas')).toBe(true));
+    await screen.findByText('VISTA_EMPLEADOS');
     expect(urlPedida('/api/pagos')).toBe(false);
     expect(urlPedida('/api/tickets')).toBe(false);
     expect(urlPedida('/api/deudores')).toBe(false);
+    expect(urlPedida('/api/campanas')).toBe(false);
   });
 
   it('el supervisor no pide datos de cobranza', async () => {
     iniciarSesion('SUPERVISOR');
     render(<App />);
 
-    await waitFor(() => expect(urlPedida('/api/campanas')).toBe(true));
+    await screen.findByText('VISTA_SUPERVISION');
     expect(urlPedida('/api/deudores')).toBe(false);
     expect(urlPedida('/api/pagos')).toBe(false);
+    expect(urlPedida('/api/campanas')).toBe(false);
   });
 });
 

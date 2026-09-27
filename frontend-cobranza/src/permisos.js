@@ -11,14 +11,14 @@ export const ROL_USUARIO = 'USUARIO';
 
 /**
  * Gestion/Info (cartera, deudores, deudas, pagos y tickets) y la meta propia
- * son del gestor. El administrador no cobra: administra personal, catalogos,
- * carteras y auditoria. El supervisor observa a su equipo.
+ * son del gestor. El administrador no cobra: solo da de alta, baja y cambia
+ * roles o campañas del personal. El supervisor observa y reparte su equipo.
  */
 export const VISTAS_POR_ROL = Object.freeze({
   GESTOR: ['info', 'cartera', 'meta'],
   USUARIO: ['info', 'cartera', 'meta'],
   SUPERVISOR: ['supervision', 'asignacionSup', 'promesasSup', 'metaEquipo'],
-  ADMINISTRADOR: ['empleados', 'asignacion', 'catalogos', 'auditoria', 'campanas'],
+  ADMINISTRADOR: ['empleados'],
 });
 
 /** Secciones del menu lateral que se muestran a cada rol. */
